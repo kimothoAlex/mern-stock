@@ -2,9 +2,13 @@ import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema(
   {
+    userId: {
+      type: String,
+      required: true,
+    },
     name: { type: String, required: true, unique: true }, // Ensure unique names
     type: { type: String, required: true }, // (e.g., Wine, Spirit)
-    category: { type: String, required: true }, // (e.g., Red Wine, Whiskey)
+    category: { type: String, required: true },
     vintage: Number, // For wines
     yearDistilled: Number, // For spirits
     price: { type: Number, required: true },
@@ -12,6 +16,11 @@ const productSchema = new mongoose.Schema(
     inStock: { type: Boolean, default: true }, // Track stock availability
     imageUrl: String, // Optional
     description: String,
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+    },
   },
   { timestamps: true }
 );
