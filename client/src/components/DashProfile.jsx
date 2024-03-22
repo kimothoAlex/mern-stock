@@ -234,14 +234,14 @@ const DashProfile = () => {
         >
           {loading ? "Loading..." : "Update Profile"}
         </Button>
-        {currentUser.isAdmin && (
-          <Link to="/create-post">
+        {currentUser && (
+          <Link to="/create-product">
             <Button
               type="button"
               className="w-full"
               gradientDuoTone="purpleToPink"
             >
-              Create Post
+              Create Product
             </Button>
           </Link>
         )}
