@@ -64,15 +64,15 @@ const DashSidebar = () => {
             </SidebarItem>
           </Link>
           {
-            currentUser.isAdmin && (
+            currentUser && (
               <>
-                  <Link to="/dashboard?tab=posts">
+                  <Link to="/dashboard?tab=products">
               <SidebarItem
-                active={tab === "posts"}
+                active={tab === "products"}
                 icon={HiOutlineDocumentText}
                 as="div"
               >
-                Posts
+                Products
               </SidebarItem>
             </Link>
                <Link to='/dashboard?tab=comments'>
