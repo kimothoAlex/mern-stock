@@ -63,7 +63,7 @@ const DashProducts = () => {
           </Table.HeadCell>
         </Table.Head>
         {products.map((product) => (
-          <Table.Body className='divide-y'>
+          <Table.Body key={product._id} className='divide-y'>
             <Table.Row className='bg-white dark:border-gray-700 dark:bg-gray-800'>
               <Table.Cell>
                 {new Date(product.updatedAt).toLocaleDateString()}
@@ -121,7 +121,7 @@ const DashProducts = () => {
       )}
     </>
   ) : (
-    <p>You have no posts yet!</p>
+    <p>You have no products yet!</p>
   )}
   
   <Modal

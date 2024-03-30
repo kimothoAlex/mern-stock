@@ -75,7 +75,7 @@ const DashSidebar = () => {
                 Products
               </SidebarItem>
             </Link>
-               <Link to='/dashboard?tab=comments'>
+               {/* <Link to='/dashboard?tab=comments'>
                 <Sidebar.Item
                   active={tab === 'comments'}
                   icon={HiAnnotation}
@@ -83,20 +83,20 @@ const DashSidebar = () => {
                 >
                   Comments
                 </Sidebar.Item>
-              </Link>
+              </Link> */}
               </>
           
             )
           }
            {currentUser.isAdmin && (
             <>
-              <Link to='/dashboard?tab=users'>
+              <Link to='/dashboard?tab=sales'>
                 <Sidebar.Item
                   active={tab === 'users'}
                   icon={HiOutlineUserGroup}
                   as='div'
                 >
-                  Users
+                  sales
                 </Sidebar.Item>
               </Link>
               
