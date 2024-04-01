@@ -4,7 +4,7 @@ import DashSidebar from "../components/DashSidebar";
 import DashProfile from "../components/DashProfile";
 import DashProducts from "../components/DashProducts";
 import DashSales from "../components/DashSales";
-
+import DashboardComp from "../components/DashboardComp";
 
 const Dashboard = () => {
   const location = useLocation();
@@ -26,10 +26,12 @@ const Dashboard = () => {
       {tab === "profile" && <DashProfile />}
       {/*Posts*/}
 
-       {/* products... */}
-       {tab === 'products' && <DashProducts />}
-       {/* sales... */}
-       {tab === 'sales' && <DashSales />}
+      {/* products... */}
+      {tab === "products" && <DashProducts />}
+      {/* sales... */}
+      {tab === "sales" && <DashSales />}
+      {/* dashboard comp */}
+      {tab === "dash" && <DashboardComp />}
     </div>
   );
 };
