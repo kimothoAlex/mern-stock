@@ -8,6 +8,8 @@ import PrivateRoute from "./components/PrivateRoute";
 import Dashboard from "./pages/Dashboard";
 import CreateProduct from "./pages/CreateProduct";
 import ProductPage from "./pages/ProductPage";
+import UpdateProduct from "./pages/UpdateProduct";
+import IsAdminPrivateRoute from "./components/IsAdminPrivateRoute";
 
 const App = () => {
   return (
@@ -20,6 +22,9 @@ const App = () => {
         <Route element={<PrivateRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/create-product" element={<CreateProduct />} />
+        </Route>
+        <Route element={< IsAdminPrivateRoute />} >
+          <Route path='/update-product/:productId' element={<UpdateProduct />} />
         </Route>
         <Route path="/product/:productSlug" element={<ProductPage />} />
       </Routes>
