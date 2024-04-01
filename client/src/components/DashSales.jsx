@@ -1,5 +1,6 @@
-import { Modal, Table } from "flowbite-react";
+import { Button, Modal, Table } from "flowbite-react";
 import React, { useEffect, useState } from "react";
+import { HiOutlineExclamationCircle } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { Link } from "react-router-dom";
 
@@ -8,7 +9,7 @@ const DashSales = () => {
   const [sales, setSales] = useState([]);
   const [showMore, setShowMore] = useState(true);
   const [showModal, setShowModal] = useState(false);
-
+  const [saleIdToDelete, setSaleIdToDelete] = useState('');
   useEffect(() => {
     const fetchSales = async () => {
       try {
@@ -43,6 +44,28 @@ const DashSales = () => {
       console.log(error.message);
     }
   };
+
+  const handleDeleteSale = async () => {
+    setShowModal(false);
+    try {
+      const res = await fetch(
+        `/api/sale/deletesale/${saleIdToDelete}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        console.log(data.message);
+      } else {
+        setSales((prev) =>
+          prev.filter((sale) => sale._id !== saleIdToDelete)
+        );
+      }
+    } catch (error) {
+      console.log(error.message);
+    }
+  };
   return (
     <div className="table-auto overflow-x-scroll md:mx-auto p-3 scrollbar scrollbar-track-slate-100 scrollbar-thumb-slate-300 dark:scrollbar-track-slate-700 dark:scrollbar-thumb-slate-500">
       {currentUser.isAdmin && sales.length > 0 ? (
@@ -54,6 +77,11 @@ const DashSales = () => {
               <Table.HeadCell>Price Per Unit</Table.HeadCell>
               <Table.HeadCell>Quantity</Table.HeadCell>
               <Table.HeadCell>Total Price</Table.HeadCell>
+              {
+                currentUser.isAdmin && (
+                  <Table.HeadCell>Delete</Table.HeadCell>
+                )
+              }
             </Table.Head>
             {sales.map((sale) => (
               <Table.Body key={sale._id} className="divide-y">
@@ -69,17 +97,22 @@ const DashSales = () => {
                   <Table.Cell>{sale.pricePerUnit}</Table.Cell>
                   <Table.Cell>{sale.quantity}</Table.Cell>
                   <Table.Cell>{sale.totalPrice}</Table.Cell>
-                  {/* <Table.Cell>
-                    <span
-                      onClick={() => {
-                        setShowModal(true);
-                        // setPostIdToDelete(post._id);
-                      }}
-                      className="font-medium text-red-500 hover:underline cursor-pointer"
-                    >
-                      Delete
-                    </span>
-                  </Table.Cell> */}
+                  {
+                    currentUser.isAdmin && (
+                      <Table.Cell>
+                      <span
+                        onClick={() => {
+                          setShowModal(true);
+                          setSaleIdToDelete(sale._id);
+                        }}
+                        className="font-medium text-red-500 hover:underline cursor-pointer"
+                      >
+                        Delete
+                      </span>
+                    </Table.Cell>
+                    )
+                  }
+                 
                 </Table.Row>
               </Table.Body>
             ))}
@@ -97,7 +130,7 @@ const DashSales = () => {
         <p>You have no sales yet!</p>
       )}
 
-      {/* <Modal
+      <Modal
     show={showModal}
     onClose={() => setShowModal(false)}
     popup
@@ -108,10 +141,10 @@ const DashSales = () => {
       <div className='text-center'>
         <HiOutlineExclamationCircle className='h-14 w-14 text-gray-400 dark:text-gray-200 mb-4 mx-auto' />
         <h3 className='mb-5 text-lg text-gray-500 dark:text-gray-400'>
-          Are you sure you want to delete this post?
+          Are you sure you want to delete this sale?
         </h3>
         <div className='flex justify-center gap-4'>
-          <Button color='failure' >
+          <Button onClick={()=>handleDeleteSale()} color='failure' >
             Yes, I'm sure
           </Button>
           <Button color='gray' onClick={() => setShowModal(false)}>
@@ -120,7 +153,7 @@ const DashSales = () => {
         </div>
       </div>
     </Modal.Body>
-  </Modal> */}
+  </Modal>
     </div>
   );
 };
