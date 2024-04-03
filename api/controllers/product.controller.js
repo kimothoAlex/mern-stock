@@ -38,10 +38,11 @@ export const getproducts = async (req, res, next) => {
     const products = await Product.find({
       ...(req.query.userId && { userId: req.query.userId }),
       ...(req.query.category && { category: req.query.category }),
+      ...(req.query.type && { type: req.query.type }),
       ...(req.query.slug && { slug: req.query.slug }),
       ...(req.query.productId && { _id: req.query.productId }),
       ...(req.query.searchTerm && {
-        title: { $regex: req.query.searchTerm, $options: "i" },
+        name: { $regex: req.query.searchTerm, $options: "i" },
       }),
     })
       .sort({ updatedAt: sortDirection })

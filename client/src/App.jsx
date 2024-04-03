@@ -10,6 +10,7 @@ import CreateProduct from "./pages/CreateProduct";
 import ProductPage from "./pages/ProductPage";
 import UpdateProduct from "./pages/UpdateProduct";
 import IsAdminPrivateRoute from "./components/IsAdminPrivateRoute";
+import Search from "./pages/Search";
 
 const App = () => {
   return (
@@ -27,6 +28,7 @@ const App = () => {
           <Route path='/update-product/:productId' element={<UpdateProduct />} />
         </Route>
         <Route path="/product/:productSlug" element={<ProductPage />} />
+        <Route path='/search' element={<Search />} />
       </Routes>
     </BrowserRouter>
   );
