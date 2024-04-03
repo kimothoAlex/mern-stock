@@ -1,4 +1,5 @@
 import Product from "../models/product.model.js";
+import { errorHandler } from "../utils/error.js";
 
 export const create = async (req, res, next) => {
   if (
@@ -100,3 +101,38 @@ export const updateproduct = async (req, res, next) => {
     next(error);
   }
 };
+
+export const aggProducts = async (req,res,next)=>{
+  if (!req.user.isAdmin) {
+    return next(
+      errorHandler(403, "You are not allowed to view the ranks")
+    );
+  }
+  const limit = parseInt(req.query.limit) || 10; // Default or query param for number of results
+
+  try {
+    const [topSold, leastSold] = await Promise.all([
+      // Aggregation for top sold products
+      Product.aggregate([
+        { $lookup: { from: 'sales', localField: '_id', foreignField: 'productId', as: 'salesData' } },
+        { $unwind: '$salesData' },
+        { $group: { _id: '$_id', totalSales: { $sum: '$salesData.quantity' }, productName: { $first: '$name' }, } },
+        { $sort: { totalSales: -1 } }, // Sort by total sales (descending)
+        { $limit: limit },
+      ]),
+      // Aggregation for least sold products
+      Product.aggregate([
+        { $lookup: { from: 'sales', localField: '_id', foreignField: 'productId', as: 'salesData' } },
+        { $unwind: { path: '$salesData', preserveNullAndEmptyArrays: true } }, // Include products with no sales
+        { $group: { _id: '$_id', totalSales: { $sum: '$salesData.quantity' }, productName: { $first: '$name' }, } },
+        { $sort: { totalSales: 1 } }, // Sort by total sales (ascending)
+        { $limit: limit },
+      ]),
+    ]);
+
+    res.json({ topSold, leastSold });
+  } catch (err) {
+    next(errorHandler(500,'Error retrieving sales ranks'));
+  }
+};
+
