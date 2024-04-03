@@ -1,13 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, registerables } from 'chart.js';
+import { Chart as ChartJS,  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement, } from 'chart.js';
 const SalesChart = () => {
   const [salesData, setSalesData] = useState({
     labels: [],
     datasets: [],
   });
   useEffect(() => {
-    ChartJS.register(...registerables);
+    ChartJS.register( CategoryScale,
+      LinearScale,
+      PointElement,
+      LineElement,
+      Title,
+      Tooltip,
+      Legend,
+      ArcElement);
    }, []);
   useEffect(() => {
     const fetchData = async () => {
