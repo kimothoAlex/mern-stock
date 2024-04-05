@@ -12,6 +12,8 @@ import { Button, Table } from "flowbite-react";
 import { Link } from "react-router-dom";
 
 const DashboardComp = () => {
+  const [topSold, setTopSold] = useState([]);
+  const [leastSold, setLeastSold] = useState([]);
   const [sales, setSales] = useState([]);
   const [lastDaySales, setLastDaySales] = useState(0);
   const [lastWeekSales, setLastWeekSales] = useState(0);
@@ -20,6 +22,8 @@ const DashboardComp = () => {
   const [lastWeekTotalSales, setLastWeekTotalSales] = useState(0);
   const [lastMonthTotalSales, setLastMonthTotalSales] = useState(0);
   const { currentUser } = useSelector((state) => state.user);
+  console.log(topSold);
+  console.log(leastSold);
   useEffect(() => {
     const fetchSales = async () => {
       try {
@@ -57,9 +61,22 @@ const DashboardComp = () => {
         console.log(error.message);
       }
     };
+    const fetchSaleRanks = async () => {
+      try {
+        const res = await fetch("/api/product/sales-rank");
+        const data = await res.json();
+        if (res.ok) {
+          setTopSold(data.topSold);
+          setLeastSold(data.leastSold);
+        }
+      } catch (error) {
+        console.log(error.message);
+      }
+    };
     if (currentUser.isAdmin) {
       fetchSales();
       fetchTotalSales();
+      fetchSaleRanks();
     }
   }, [currentUser]);
   return (
@@ -110,7 +127,7 @@ const DashboardComp = () => {
               <HiArrowNarrowUp />
               {lastMonthTotalSales}
             </span>
-            <div className="text-gray-500">Last monthSales</div>
+            <div className="text-gray-500">Last Month Sales</div>
           </div>
         </div>
       </div>
@@ -140,62 +157,60 @@ const DashboardComp = () => {
               ))}
           </Table>
         </div>
-        {/* //   <div className='flex flex-col w-full md:w-auto shadow-md p-2 rounded-md dark:bg-gray-800'>
-    //     <div className='flex justify-between  p-3 text-sm font-semibold'>
-    //       <h1 className='text-center p-2'>Recent comments</h1>
-    //       <Button outline gradientDuoTone='purpleToPink'>
-    //         <Link to={'/dashboard?tab=comments'}>See all</Link>
-    //       </Button>
-    //     </div>
-    //     <Table hoverable>
-    //       <Table.Head>
-    //         <Table.HeadCell>Comment content</Table.HeadCell>
-    //         <Table.HeadCell>Likes</Table.HeadCell>
-    //       </Table.Head>
-    //       {comments &&
-    //         comments.map((comment) => (
-    //           <Table.Body key={comment._id} className='divide-y'>
-    //             <Table.Row className='bg-white dark:border-gray-700 dark:bg-gray-800'>
-    //               <Table.Cell className='w-96'>
-    //                   <p className='line-clamp-2'>{comment.content}</p>
-    //               </Table.Cell>
-    //               <Table.Cell>{comment.numberOfLikes}</Table.Cell>
-    //             </Table.Row>
-    //           </Table.Body>
-    //         ))}
-    //     </Table>
-    //   </div>
-    //   <div className='flex flex-col w-full md:w-auto shadow-md p-2 rounded-md dark:bg-gray-800'>
-    //     <div className='flex justify-between  p-3 text-sm font-semibold'>
-    //       <h1 className='text-center p-2'>Recent posts</h1>
-    //       <Button outline gradientDuoTone='purpleToPink'>
-    //         <Link to={'/dashboard?tab=posts'}>See all</Link>
-    //       </Button>
-    //     </div>
-    //     <Table hoverable>
-    //       <Table.Head>
-    //         <Table.HeadCell>Post image</Table.HeadCell>
-    //         <Table.HeadCell>Post Title</Table.HeadCell>
-    //         <Table.HeadCell>Category</Table.HeadCell>
-    //       </Table.Head>
-    //       {posts &&
-    //         posts.map((post) => (
-    //           <Table.Body key={post._id} className='divide-y'>
-    //             <Table.Row className='bg-white dark:border-gray-700 dark:bg-gray-800'>
-    //               <Table.Cell>
-    //                 <img
-    //                   src={post.image}
-    //                   alt='user'
-    //                   className='w-14 h-10 rounded-md bg-gray-500'
-    //                 />
-    //               </Table.Cell>
-    //               <Table.Cell className='w-96'>{post.title}</Table.Cell>
-    //               <Table.Cell className='w-5'>{post.category}</Table.Cell>
-    //             </Table.Row>
-    //           </Table.Body>
-    //         ))}
-    //     </Table>
-    //   </div> */}
+        <div className="flex flex-col w-full md:w-auto shadow-md p-2 rounded-md dark:bg-gray-800">
+          <div className="flex justify-between  p-3 text-sm font-semibold">
+            <h1 className="text-center p-2">Top Sold</h1>
+            <Button outline gradientDuoTone="purpleToPink">
+              <Link to={"/dashboard?tab=products"}>See all</Link>
+            </Button>
+          </div>
+          <Table hoverable>
+            <Table.Head>
+              <Table.HeadCell>Product Name</Table.HeadCell>
+              <Table.HeadCell>Products</Table.HeadCell>
+              <Table.HeadCell>Amount Generated</Table.HeadCell>
+            </Table.Head>
+            {topSold &&
+              topSold.map((top) => (
+                <Table.Body key={top._id} className="divide-y">
+                  <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
+                    <Table.Cell >
+                      <p>{top.productName}</p>
+                    </Table.Cell>
+                    <Table.Cell>{top.totalSales}</Table.Cell>
+                    <Table.Cell>{top.amountGenerated}</Table.Cell>
+                  </Table.Row>
+                </Table.Body>
+              ))}
+          </Table>
+        </div>
+        <div className="flex flex-col w-full md:w-auto shadow-md p-2 rounded-md dark:bg-gray-800">
+          <div className="flex justify-between  p-3 text-sm font-semibold">
+            <h1 className="text-center p-2">Least Sold</h1>
+            <Button outline gradientDuoTone="purpleToPink">
+              <Link to={"/dashboard?tab=products"}>See all</Link>
+            </Button>
+          </div>
+          <Table hoverable>
+            <Table.Head>
+              <Table.HeadCell>Product Name</Table.HeadCell>
+              <Table.HeadCell>Products</Table.HeadCell>
+              <Table.HeadCell>Amount Generated</Table.HeadCell>
+            </Table.Head>
+            {leastSold &&
+              leastSold.map((least) => (
+                <Table.Body key={least._id} className="divide-y">
+                  <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
+                    <Table.Cell>{least.productName}</Table.Cell>
+                    <Table.Cell>{least.totalSales}</Table.Cell>
+                    <Table.Cell>
+                      {least.amountGenerated}
+                    </Table.Cell>
+                  </Table.Row>
+                </Table.Body>
+              ))}
+          </Table>
+        </div>
       </div>
     </div>
   );
