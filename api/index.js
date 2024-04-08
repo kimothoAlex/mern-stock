@@ -7,6 +7,7 @@ import productRoutes from "./routes/product.route.js";
 import salesRoutes from "./routes/sales.route.js"
 import cookieParser from "cookie-parser";
 import sseServer from "./controllers/sseServer.js"
+import cors from "cors"
 dotenv.config();
 const app = express();
 
@@ -25,6 +26,10 @@ mongoose
 app.listen(3000, () => {
   console.log("Server is running on port 3000!");
 });
+
+app.use(cors({
+  origin: 'http://localhost:5173'
+}));
 app.use("/api/auth", authRoutes);
 app.use('/api/user', userRoutes);
 app.use("/api/product",productRoutes);

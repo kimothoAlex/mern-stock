@@ -8,7 +8,7 @@ import {
 } from "react-icons/hi";
 
 import { useSelector } from "react-redux";
-import { Button, Table } from "flowbite-react";
+import { Alert, Button, Table } from "flowbite-react";
 import { Link } from "react-router-dom";
 
 const DashboardComp = () => {
@@ -21,9 +21,9 @@ const DashboardComp = () => {
   const [lastDayTotalSales, setLastDayTotalSales] = useState(0);
   const [lastWeekTotalSales, setLastWeekTotalSales] = useState(0);
   const [lastMonthTotalSales, setLastMonthTotalSales] = useState(0);
+  const [lowStockProducts, setLowStockProducts] = useState([]);
   const { currentUser } = useSelector((state) => state.user);
-  console.log(topSold);
-  console.log(leastSold);
+  console.log(lowStockProducts);
   useEffect(() => {
     const fetchSales = async () => {
       try {
@@ -79,8 +79,26 @@ const DashboardComp = () => {
       fetchSaleRanks();
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    const eventSource = new EventSource("http://localhost:5000/stock-updates");
+
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      setLowStockProducts(data.lowStockProducts);
+    };
+
+    return () => eventSource.close(); // Cleanup: Close connection on unmount
+  }, []);
   return (
     <div className="p-3 md:mx-auto">
+      {lowStockProducts?.map((name) => (
+        <Alert className="p-3 mb-3" key={name} onDismiss={() => {}} withBorderAccent>
+          <span>
+            <span className="font-medium">Low Stock alert!</span> For {name}
+          </span>
+        </Alert>
+      ))}
       <div className="flex-wrap flex gap-4 justify-center">
         <div className="flex flex-col p-3 dark:bg-slate-800 gap-4 md:w-72 w-full rounded-md shadow-md">
           <div className="flex justify-between">
@@ -174,7 +192,7 @@ const DashboardComp = () => {
               topSold.map((top) => (
                 <Table.Body key={top._id} className="divide-y">
                   <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
-                    <Table.Cell >
+                    <Table.Cell>
                       <p>{top.productName}</p>
                     </Table.Cell>
                     <Table.Cell>{top.totalSales}</Table.Cell>
@@ -203,9 +221,7 @@ const DashboardComp = () => {
                   <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
                     <Table.Cell>{least.productName}</Table.Cell>
                     <Table.Cell>{least.totalSales}</Table.Cell>
-                    <Table.Cell>
-                      {least.amountGenerated}
-                    </Table.Cell>
+                    <Table.Cell>{least.amountGenerated}</Table.Cell>
                   </Table.Row>
                 </Table.Body>
               ))}
