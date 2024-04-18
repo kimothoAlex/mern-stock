@@ -6,6 +6,7 @@ import {
   HiDocumentText,
   HiOutlineUserGroup,
 } from "react-icons/hi";
+import { BsCashCoin } from "react-icons/bs";
 
 import { useSelector } from "react-redux";
 import { Alert, Button, Table } from "flowbite-react";
@@ -106,7 +107,7 @@ const DashboardComp = () => {
               <h3 className="text-gray-500 text-md uppercase">Last Day</h3>
               <p className="text-2xl">{lastDaySales}</p>
             </div>
-            <HiOutlineUserGroup className="bg-teal-600  text-white rounded-full text-5xl p-3 shadow-lg" />
+            <BsCashCoin className="bg-teal-600  text-white rounded-full text-5xl p-3 shadow-lg" />
           </div>
           <div className="flex  gap-2 text-sm">
             <span className="text-green-500 flex items-center">
@@ -122,7 +123,7 @@ const DashboardComp = () => {
               <h3 className="text-gray-500 text-md uppercase">Last Week</h3>
               <p className="text-2xl">{lastWeekSales}</p>
             </div>
-            <HiAnnotation className="bg-indigo-600  text-white rounded-full text-5xl p-3 shadow-lg" />
+            <BsCashCoin className="bg-indigo-600  text-white rounded-full text-5xl p-3 shadow-lg" />
           </div>
           <div className="flex  gap-2 text-sm">
             <span className="text-green-500 flex items-center">
@@ -138,7 +139,7 @@ const DashboardComp = () => {
               <h3 className="text-gray-500 text-md uppercase">Last Month</h3>
               <p className="text-2xl">{lastMonthSales}</p>
             </div>
-            <HiDocumentText className="bg-lime-600  text-white rounded-full text-5xl p-3 shadow-lg" />
+            <BsCashCoin className="bg-lime-600  text-white rounded-full text-5xl p-3 shadow-lg" />
           </div>
           <div className="flex  gap-2 text-sm">
             <span className="text-green-500 flex items-center">

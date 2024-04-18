@@ -1,6 +1,7 @@
 import { Spinner } from "flowbite-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { enqueueSnackbar } from "notistack";
 import {
   Button,
   Checkbox,
@@ -94,6 +95,7 @@ const ProductPage = () => {
       }
 
       if (response.ok) {
+        enqueueSnackbar("Sale Completed Successfully",{variant:"success"});
         navigate("/dashboard?tab=products");
       }
     } catch (error) {
@@ -134,7 +136,9 @@ const ProductPage = () => {
               {`Quantity in stock: ${product && product.quantity}`}
             </span>
           </div>
-          <Button type="submit" onClick={() => setOpenModal(true)}>Sell Now</Button>
+          <Button type="submit" onClick={() => setOpenModal(true)}>
+            Sell Now
+          </Button>
         </div>
 
         <Modal show={openModal} size="md" onClose={onCloseModal} popup>
@@ -152,7 +156,7 @@ const ProductPage = () => {
                   type="number"
                   min={0}
                   id="quantity"
-                  placeholder="name@company.com"
+                  placeholder="number of products to be sold"
                   value={quantity}
                   onChange={handleChange}
                   required

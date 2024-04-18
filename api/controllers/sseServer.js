@@ -17,12 +17,14 @@ const sendStockUpdate = (lowStockProducts) => {
 
 // Function to check stock levels and broadcast updates periodically
 const checkStockLevels = async () => {
-  const products = await Product.find({ quantity: { $lt: reorderPoint }});
+  const products = await Product.find({ quantity: { $lt: reorderPoint } });
   const reducedProducts = products.reduce((acc, product) => {
     acc[product.name] = product.quantity;
     return acc;
   }, {});
-  const lowStockProducts = Object.entries(reducedProducts).map((productName)=>productName[0]);
+  const lowStockProducts = Object.entries(reducedProducts).map(
+    (productName) => productName[0]
+  );
 
   if (lowStockProducts.length > 0) {
     sendStockUpdate(lowStockProducts);
@@ -45,18 +47,16 @@ const init = async (app) => {
       clients.delete(res); // Remove client on connection close
     });
 
-    res.write(':\n\n');
+    res.write(":\n\n");
 
-    const intervalId = setInterval(checkStockLevels, 5000); // Check stock levels every 5 seconds (adjust as needed)
-
+    const intervalId = setInterval(checkStockLevels, 2 * 60 * 60 * 1000); // Check stock levels every 5 seconds (adjust as needed)
+    (async () => {
+      checkStockLevels(); // Check stock levels initially
+    })();
     res.on("close", () => {
       clearInterval(intervalId);
     });
   });
-
-  (async () => {
-    checkStockLevels(); // Check stock levels initially
-  })();
 
   server.listen(5000, () => console.log("SSE server listening"));
 };

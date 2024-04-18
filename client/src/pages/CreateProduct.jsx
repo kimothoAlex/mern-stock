@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { enqueueSnackbar } from "notistack";
 import {
   Alert,
   Button,
@@ -81,6 +82,7 @@ const CreateProduct = () => {
       }
 
       if (res.ok) {
+        enqueueSnackbar("Product Created Successfully", { variant: "success" });
         setPublishError(null);
         navigate(`/product/${data.slug}`);
       }
@@ -90,7 +92,9 @@ const CreateProduct = () => {
   };
   return (
     <div className="p-3 max-w-3xl mx-auto min-h-screen">
-      <h1 className="text-center my-7 font-semibold text-3xl">Create Product</h1>
+      <h1 className="text-center my-7 font-semibold text-3xl">
+        Create Product
+      </h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-4 sm:flex-row justify-between ">
           <TextInput
@@ -99,9 +103,7 @@ const CreateProduct = () => {
             required
             id="name"
             className="flex-1"
-            onChange={(e) =>
-              setFormData({ ...formData, name: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           />
           <Select
             onChange={(e) =>
@@ -138,7 +140,6 @@ const CreateProduct = () => {
               "Upload Image"
             )}
           </Button>
-          
         </div>
         <div className="flex flex-col gap-4 sm:flex-row justify-between ">
           <TextInput
@@ -153,27 +154,29 @@ const CreateProduct = () => {
             }
           />
           <Select
-            onChange={(e) =>
-              setFormData({ ...formData, type: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
           >
             <option value="uncategorized">Select type</option>
             <option value="beer">Beer</option>
             <option value="wine">Wine</option>
             <option value="spirit">Spirit</option>
+            <option value="gin">Gin</option>
+            <option value="whisky">Whisky</option>
+            <option value="vodka">Vodka</option>
+            <option value="brandy">Brandy</option>
           </Select>
         </div>
         <TextInput
-            type="number"
-            placeholder="Quantity"
-            min="0"
-            required
-            id="quantity"
-            className="flex-1"
-            onChange={(e) =>
-              setFormData({ ...formData, quantity: e.target.value })
-            }
-          />
+          type="number"
+          placeholder="Quantity"
+          min="0"
+          required
+          id="quantity"
+          className="flex-1"
+          onChange={(e) =>
+            setFormData({ ...formData, quantity: e.target.value })
+          }
+        />
         {imageUploadError && <Alert color="failure">{imageUploadError}</Alert>}
         {formData.image && (
           <img

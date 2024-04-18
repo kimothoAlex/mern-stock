@@ -3,13 +3,14 @@ import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { Link } from "react-router-dom";
 import { HiOutlineExclamationCircle } from "react-icons/hi";
+import { enqueueSnackbar } from "notistack";
 
 const DashProducts = () => {
   const { currentUser } = useSelector((state) => state.user);
   const [products, setProducts] = useState([]);
   const [showMore, setShowMore] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [productIdToDelete, setProductIdToDelete] = useState('');
+  const [productIdToDelete, setProductIdToDelete] = useState("");
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -32,7 +33,9 @@ const DashProducts = () => {
   const handleShowMore = async () => {
     const startIndex = products.length;
     try {
-      const res = await fetch(`/api/post/getposts?startIndex=${startIndex}`);
+      const res = await fetch(
+        `/api/product/getproducts?startIndex=${startIndex}`
+      );
       const data = await res.json();
       if (res.ok) {
         setProducts((prev) => [...prev, ...data.products]);
@@ -48,12 +51,9 @@ const DashProducts = () => {
   const handleDeleteProduct = async () => {
     setShowModal(false);
     try {
-      const res = await fetch(
-        `/api/product/delete/${productIdToDelete}`,
-        {
-          method: 'DELETE',
-        }
-      );
+      const res = await fetch(`/api/product/delete/${productIdToDelete}`, {
+        method: "DELETE",
+      });
       const data = await res.json();
       if (!res.ok) {
         console.log(data.message);
@@ -61,6 +61,7 @@ const DashProducts = () => {
         setProducts((prev) =>
           prev.filter((product) => product._id !== productIdToDelete)
         );
+        enqueueSnackbar("Product deleted successfully",{variant:"success"});
       }
     } catch (error) {
       console.log(error.message);
@@ -78,6 +79,7 @@ const DashProducts = () => {
               <Table.HeadCell>Category</Table.HeadCell>
               <Table.HeadCell>Type</Table.HeadCell>
               <Table.HeadCell>Quantity</Table.HeadCell>
+              <Table.HeadCell>Price</Table.HeadCell>
               {currentUser.isAdmin && (
                 <>
                   <Table.HeadCell>Delete</Table.HeadCell>
@@ -113,6 +115,7 @@ const DashProducts = () => {
                   <Table.Cell>{product.category}</Table.Cell>
                   <Table.Cell>{product.type}</Table.Cell>
                   <Table.Cell>{product.quantity}</Table.Cell>
+                  <Table.Cell>{product.price}</Table.Cell>
                   {currentUser.isAdmin && (
                     <>
                       <Table.Cell>
@@ -167,7 +170,9 @@ const DashProducts = () => {
               Are you sure you want to delete this product?
             </h3>
             <div className="flex justify-center gap-4">
-              <Button color="failure" onClick={handleDeleteProduct}>Yes, I'm sure</Button>
+              <Button color="failure" onClick={handleDeleteProduct}>
+                Yes, I'm sure
+              </Button>
               <Button color="gray" onClick={() => setShowModal(false)}>
                 No, cancel
               </Button>

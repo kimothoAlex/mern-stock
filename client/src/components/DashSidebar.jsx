@@ -4,14 +4,25 @@ import {
   SidebarItemGroup,
   SidebarItems,
 } from "flowbite-react";
-import { HiAnnotation, HiArrowSmRight, HiChartPie, HiDocumentText, HiOutlineDocumentText, HiOutlineUserGroup, HiUser } from "react-icons/hi";
+import {
+  HiAnnotation,
+  HiArrowSmRight,
+  HiChartPie,
+  HiDocumentText,
+  HiOutlineDocumentText,
+  HiOutlineUserGroup,
+  HiUser,
+} from "react-icons/hi";
+import { BsCashCoin } from "react-icons/bs";
+import { LiaProductHunt } from "react-icons/lia";
 import React, { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { signoutSuccess } from "../redux/user/userSlice";
 const DashSidebar = () => {
-  const {currentUser} = useSelector((state)=>state.user);
+  const { currentUser } = useSelector((state) => state.user);
   const location = useLocation();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const [tab, setTab] = useState("");
   useEffect(() => {
@@ -32,6 +43,7 @@ const DashSidebar = () => {
         console.log(data.message);
       } else {
         dispatch(signoutSuccess());
+        navigate("/sign-in");
       }
     } catch (error) {
       console.log(error);
@@ -41,12 +53,12 @@ const DashSidebar = () => {
     <Sidebar className="w-full md:w-56 flex flex-col gap-2">
       <SidebarItems>
         <SidebarItemGroup>
-        {currentUser && currentUser.isAdmin && (
-            <Link to='/dashboard?tab=dash'>
+          {currentUser && currentUser.isAdmin && (
+            <Link to="/dashboard?tab=dash">
               <Sidebar.Item
-                active={tab === 'dash' || !tab}
+                active={tab === "dash" || !tab}
                 icon={HiChartPie}
-                as='div'
+                as="div"
               >
                 Dashboard
               </Sidebar.Item>
@@ -63,19 +75,18 @@ const DashSidebar = () => {
               Profile
             </SidebarItem>
           </Link>
-          {
-            currentUser && (
-              <>
-                  <Link to="/dashboard?tab=products">
-              <SidebarItem
-                active={tab === "products"}
-                icon={HiOutlineDocumentText}
-                as="div"
-              >
-                Products
-              </SidebarItem>
-            </Link>
-               {/* <Link to='/dashboard?tab=comments'>
+          {currentUser && (
+            <>
+              <Link to="/dashboard?tab=products">
+                <SidebarItem
+                  active={tab === "products"}
+                  icon={LiaProductHunt}
+                  as="div"
+                >
+                  Products
+                </SidebarItem>
+              </Link>
+              {/* <Link to='/dashboard?tab=comments'>
                 <Sidebar.Item
                   active={tab === 'comments'}
                   icon={HiAnnotation}
@@ -84,22 +95,19 @@ const DashSidebar = () => {
                   Comments
                 </Sidebar.Item>
               </Link> */}
-              </>
-          
-            )
-          }
-           {currentUser.isAdmin && (
+            </>
+          )}
+          {currentUser.isAdmin && (
             <>
-              <Link to='/dashboard?tab=sales'>
+              <Link to="/dashboard?tab=sales">
                 <Sidebar.Item
-                  active={tab === 'users'}
-                  icon={HiOutlineUserGroup}
-                  as='div'
+                  active={tab === "users"}
+                  icon={BsCashCoin}
+                  as="div"
                 >
                   sales
                 </Sidebar.Item>
               </Link>
-              
             </>
           )}
           <SidebarItem

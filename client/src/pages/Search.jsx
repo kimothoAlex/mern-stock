@@ -124,6 +124,10 @@ export default function Search() {
               <option value="beer">Beer</option>
               <option value="spirit">Spirit</option>
               <option value="wine">Wine</option>
+              <option value="gin">Gin</option>
+            <option value="whisky">Whisky</option>
+            <option value="vodka">Vodka</option>
+            <option value="brandy">Brandy</option>
             </Select>
           </div>
           <div className="flex items-center gap-2">
