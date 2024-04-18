@@ -94,9 +94,9 @@ const DashSales = () => {
                       {sale.productName}
                     </Link>
                   </Table.Cell>
-                  <Table.Cell>{sale.pricePerUnit}</Table.Cell>
+                  <Table.Cell>{sale.pricePerUnit.toLocaleString()}</Table.Cell>
                   <Table.Cell>{sale.quantity}</Table.Cell>
-                  <Table.Cell>{sale.totalPrice}</Table.Cell>
+                  <Table.Cell>{sale.totalPrice.toLocaleString()}</Table.Cell>
                   {
                     currentUser.isAdmin && (
                       <Table.Cell>

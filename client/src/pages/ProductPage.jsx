@@ -121,7 +121,7 @@ const ProductPage = () => {
             </h1>
             <div className="flex items-center mb-4">
               <span className="text-lg font-semibold mr-2">
-                {`KES ${product && product.price.toFixed(2)}`}
+                {`KES ${product && product.price.toLocaleString()}`}
               </span>
               <div className="flex items-center space-x-1">
                 <span className="text-gray-500">{product && product.type}</span>
@@ -167,7 +167,7 @@ const ProductPage = () => {
                   <div className="mb-2 block">
                     <p className="text-sm font-semibold">Amount Payable</p>
                   </div>
-                  <p>{quantity * product.price}</p>
+                  <p>{(quantity * product.price).toLocaleString()}</p>
                 </div>
               )}
 

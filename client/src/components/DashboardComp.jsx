@@ -25,7 +25,7 @@ const DashboardComp = () => {
   const [lastMonthTotalSales, setLastMonthTotalSales] = useState(0);
   const [lowStockProducts, setLowStockProducts] = useState([]);
   const { currentUser } = useSelector((state) => state.user);
-  console.log(lowStockProducts);
+  console.log(lastDaySales);
   useEffect(() => {
     const fetchSales = async () => {
       try {
@@ -105,14 +105,14 @@ const DashboardComp = () => {
           <div className="flex justify-between">
             <div className="">
               <h3 className="text-gray-500 text-md uppercase">Last Day</h3>
-              <p className="text-2xl">{lastDaySales}</p>
+              <p className="text-2xl">{parseFloat(lastDaySales).toLocaleString()}</p>
             </div>
             <BsCashCoin className="bg-teal-600  text-white rounded-full text-5xl p-3 shadow-lg" />
           </div>
           <div className="flex  gap-2 text-sm">
             <span className="text-green-500 flex items-center">
               <HiArrowNarrowUp />
-              {lastDayTotalSales}
+              {lastDayTotalSales.toLocaleString()}
             </span>
             <div className="text-gray-500">Last Day Sales</div>
           </div>
@@ -128,7 +128,7 @@ const DashboardComp = () => {
           <div className="flex  gap-2 text-sm">
             <span className="text-green-500 flex items-center">
               <HiArrowNarrowUp />
-              {lastWeekTotalSales}
+              {lastWeekTotalSales.toLocaleString()}
             </span>
             <div className="text-gray-500">Last Week Sales</div>
           </div>
@@ -144,7 +144,7 @@ const DashboardComp = () => {
           <div className="flex  gap-2 text-sm">
             <span className="text-green-500 flex items-center">
               <HiArrowNarrowUp />
-              {lastMonthTotalSales}
+              {lastMonthTotalSales.toLocaleString()}
             </span>
             <div className="text-gray-500">Last Month Sales</div>
           </div>
@@ -170,7 +170,7 @@ const DashboardComp = () => {
                   <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
                     <Table.Cell>{sale.productName}</Table.Cell>
                     <Table.Cell>{sale.quantity}</Table.Cell>
-                    <Table.Cell>{sale.totalPrice}</Table.Cell>
+                    <Table.Cell>{sale.totalPrice.toLocaleString()}</Table.Cell>
                   </Table.Row>
                 </Table.Body>
               ))}
@@ -197,7 +197,7 @@ const DashboardComp = () => {
                       <p>{top.productName}</p>
                     </Table.Cell>
                     <Table.Cell>{top.totalSales}</Table.Cell>
-                    <Table.Cell>{top.amountGenerated}</Table.Cell>
+                    <Table.Cell>{top.amountGenerated.toLocaleString()}</Table.Cell>
                   </Table.Row>
                 </Table.Body>
               ))}
@@ -222,7 +222,7 @@ const DashboardComp = () => {
                   <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
                     <Table.Cell>{least.productName}</Table.Cell>
                     <Table.Cell>{least.totalSales}</Table.Cell>
-                    <Table.Cell>{least.amountGenerated}</Table.Cell>
+                    <Table.Cell>{least.amountGenerated.toLocaleString()}</Table.Cell>
                   </Table.Row>
                 </Table.Body>
               ))}

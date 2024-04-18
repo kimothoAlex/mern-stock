@@ -115,7 +115,7 @@ const DashProducts = () => {
                   <Table.Cell>{product.category}</Table.Cell>
                   <Table.Cell>{product.type}</Table.Cell>
                   <Table.Cell>{product.quantity}</Table.Cell>
-                  <Table.Cell>{product.price}</Table.Cell>
+                  <Table.Cell>{product.price.toLocaleString()}</Table.Cell>
                   {currentUser.isAdmin && (
                     <>
                       <Table.Cell>
