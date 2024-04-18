@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { enqueueSnackbar } from "notistack";
 import SalesChart from "./TotalSalesComp";
 import {
   HiAnnotation,
@@ -88,18 +89,17 @@ const DashboardComp = () => {
       const data = JSON.parse(event.data);
       setLowStockProducts(data.lowStockProducts);
     };
-
+    
     return () => eventSource.close(); // Cleanup: Close connection on unmount
   }, []);
+
+  useEffect(()=>{
+    lowStockProducts?.map((name) => (
+      enqueueSnackbar(`Low stock Alert for ${name}`,{variant:"warning"})
+    ))
+  },[lowStockProducts])
   return (
     <div className="p-3 md:mx-auto">
-      {lowStockProducts?.map((name) => (
-        <Alert className="p-3 mb-3" key={name} onDismiss={() => {}} withBorderAccent>
-          <span>
-            <span className="font-medium">Low Stock alert!</span> For {name}
-          </span>
-        </Alert>
-      ))}
       <div className="flex-wrap flex gap-4 justify-center">
         <div className="flex flex-col p-3 dark:bg-slate-800 gap-4 md:w-72 w-full rounded-md shadow-md">
           <div className="flex justify-between">
@@ -223,6 +223,27 @@ const DashboardComp = () => {
                     <Table.Cell>{least.productName}</Table.Cell>
                     <Table.Cell>{least.totalSales}</Table.Cell>
                     <Table.Cell>{least.amountGenerated}</Table.Cell>
+                  </Table.Row>
+                </Table.Body>
+              ))}
+          </Table>
+        </div>
+        <div className="flex flex-col w-full md:w-auto shadow-md p-2 rounded-md dark:bg-gray-800">
+          <div className="flex justify-between  p-3 text-sm font-semibold">
+            <h1 className="text-center p-2">Low Stock Products</h1>
+            <Button outline gradientDuoTone="purpleToPink">
+              <Link to={"/dashboard?tab=products"}>See all</Link>
+            </Button>
+          </div>
+          <Table hoverable>
+            <Table.Head>
+              <Table.HeadCell>Product Name</Table.HeadCell>
+            </Table.Head>
+            {lowStockProducts &&
+              lowStockProducts.map((name) => (
+                <Table.Body key={name} className="divide-y">
+                  <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
+                    <Table.Cell>{name}</Table.Cell>
                   </Table.Row>
                 </Table.Body>
               ))}
