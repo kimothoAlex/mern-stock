@@ -1,5 +1,4 @@
 import { Alert, Button, Label, Spinner, TextInput } from 'flowbite-react';
-import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -7,13 +6,29 @@ import {
   signInSuccess,
   signInFailure,
 } from '../redux/user/userSlice';
+import React, { useState, useEffect } from 'react';
+import { app } from "../fierbase";
+import { getStorage, ref, getDownloadURL } from 'firebase/storage';
 
 
 export default function SignIn() {
+  const [imageUrl, setImageUrl] = useState(null);
   const [formData, setFormData] = useState({});
   const { loading, error: errorMessage } = useSelector((state) => state.user);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  useEffect(() => {
+    const storage = getStorage(app);
+    const fileRef = ref(storage, 'gs://mern-stock.appspot.com/Alin.jpg'); // Replace with your file path
+
+    getDownloadURL(fileRef)
+      .then((url) => {
+        setImageUrl(url);
+      })
+      .catch((error) => {
+        console.error('Error getting download URL:', error);
+      });
+  }, []);
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value.trim() });
   };
@@ -48,7 +63,7 @@ export default function SignIn() {
         {/* left */}
         <div className='flex-1'>
           <Link to='/' className='font-bold dark:text-white text-4xl'>
-            <img className='rounded-full' src="/Alin.jpg" alt="" />
+            <img className='rounded-full' src={imageUrl} alt="" />
             
           </Link>
         </div>

@@ -16,6 +16,8 @@ import { useSelector, useDispatch } from "react-redux";
 import { toggleTheme } from "../redux/theme/themeSlice";
 import { signoutSuccess } from "../redux/user/userSlice";
 import { useEffect, useState } from "react";
+import { app } from "../fierbase";
+import { getStorage, ref, getDownloadURL } from "firebase/storage";
 
 const Header = () => {
   const path = useLocation().pathname;
@@ -25,12 +27,22 @@ const Header = () => {
   const { currentUser } = useSelector((state) => state.user);
   const { theme } = useSelector((state) => state.theme);
   const [searchTerm, setSearchTerm] = useState("");
+  const [imageUrl, setImageUrl] = useState(null);
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const searchTermFromUrl = urlParams.get("searchTerm");
     if (searchTermFromUrl) {
       setSearchTerm(searchTermFromUrl);
     }
+    const storage = getStorage(app);
+    const fileRef = ref(storage, "gs://mern-stock.appspot.com/Alin.jpg");
+    getDownloadURL(fileRef)
+      .then((url) => {
+        setImageUrl(url);
+      })
+      .catch((error) => {
+        console.error("Error getting download URL:", error);
+      });
   }, [location.search]);
 
   const handleSignout = async () => {
@@ -59,7 +71,7 @@ const Header = () => {
   return (
     <Navbar className="border-b-2">
       <Link to="/">
-        <img className="rounded-full h-14" src="/Alin.jpg" alt="" />
+        <img className="rounded-full h-14" src={imageUrl} alt="" />
       </Link>
       <form onSubmit={handleSubmit}>
         <TextInput
