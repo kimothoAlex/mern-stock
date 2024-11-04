@@ -12,6 +12,7 @@ import { BsCashCoin } from "react-icons/bs";
 import { useSelector } from "react-redux";
 import { Alert, Button, Table } from "flowbite-react";
 import { Link } from "react-router-dom";
+import SalesReport from "./SalesReport";
 
 const DashboardComp = () => {
   const [topSold, setTopSold] = useState([]);
@@ -25,7 +26,6 @@ const DashboardComp = () => {
   const [lastMonthTotalSales, setLastMonthTotalSales] = useState(0);
   const [lowStockProducts, setLowStockProducts] = useState([]);
   const { currentUser } = useSelector((state) => state.user);
-  console.log(lastDaySales);
   useEffect(() => {
     const fetchSales = async () => {
       try {
@@ -115,6 +115,7 @@ const DashboardComp = () => {
               {lastDayTotalSales.toLocaleString()}
             </span>
             <div className="text-gray-500">Last Day Sales</div>
+            {/* <SalesReport /> */}
           </div>
         </div>
         <div className="flex flex-col p-3 dark:bg-slate-800 gap-4 md:w-72 w-full rounded-md shadow-md">

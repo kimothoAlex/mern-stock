@@ -8,6 +8,7 @@ import salesRoutes from "./routes/sales.route.js"
 import cookieParser from "cookie-parser";
 import sseServer from "./controllers/sseServer.js"
 import cors from "cors"
+import path from "path"
 dotenv.config();
 const app = express();
 
@@ -22,6 +23,7 @@ mongoose
     console.log(error);
   });
 
+  const _dirname = path.resolve();
 
 app.listen(3000, () => {
   console.log("Server is running on port 3000!");
@@ -36,6 +38,10 @@ app.use("/api/product",productRoutes);
 app.use("/api/sale",salesRoutes);
 sseServer(app);
 
+app.use(express.static(path.join(_dirname, "/client/dist")));
+app.get("*", (req,res)=>{
+  res.sendFile(path.join(_dirname, "client", "dist", "index.html"))
+});
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || "Internal Server Error";

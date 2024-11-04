@@ -16,6 +16,7 @@ const UpdateProduct = () => {
   const [file, setFile] = useState(null);
   const [imageUploadProgress, setImageUploadProgress] = useState(null);
   const [imageUploadError, setImageUploadError] = useState(null);
+  const [imageFileUrl, setImageFileUrl] = useState(null);
   const [formData, setFormData] = useState({});
   const [updateError, setUpdateError] = useState(null);
   const { productId } = useParams();
@@ -71,6 +72,7 @@ const UpdateProduct = () => {
         },
         () => {
           getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            setImageFileUrl(downloadURL);
             setImageUploadProgress(null);
             setImageUploadError(null);
             setFormData({ ...formData, image: downloadURL });
@@ -156,6 +158,7 @@ const UpdateProduct = () => {
             <option value="750ml">750ml</option>
             <option value="350ml">350ml</option>
             <option value="250ml">250ml</option>
+            <option value="125ml">125ml</option>
           </Select>
           <Select
             onChange={(e) => setFormData({ ...formData, type: e.target.value })}
@@ -200,7 +203,7 @@ const UpdateProduct = () => {
         {imageUploadError && <Alert color="failure">{imageUploadError}</Alert>}
         {formData.imageUrl && (
           <img
-            src={formData.imageUrl}
+            src={imageFileUrl || formData.imageUrl}
             alt="upload"
             className="w-full h-72 object-cover"
           />

@@ -32,9 +32,9 @@ export const createSale = async (req, res, next) => {
 };
 
 export const getSales = async (req, res, next) => {
-  if (!req.user.isAdmin) {
-    return next(errorHandler(403, "You are not allowed to see all sales"));
-  }
+  // if (!req.user.isAdmin) {
+  //   return next(errorHandler(403, "You are not allowed to see all sales"));
+  // }
   try {
     const startIndex = parseInt(req.query.startIndex) || 0;
     const limit = parseInt(req.query.limit) || 9;
@@ -134,3 +134,16 @@ export const totalSales = async (req, res, next) => {
     next(errorHandler(500, "Error retrieving total sales")); // Handle errors
   }
 };
+
+export const lastDaySales = async (req,res,next) =>{
+  if (!req.user.isAdmin) {
+    return next(errorHandler(403, "You are not allowed to delete this sale"));
+  }
+try {
+  const now = new Date();
+  const lastDaySales= await Sale.find({ createdAt: { $gte: new Date(now - 7 * 24 * 60 * 60 * 1000) }});
+  res.status(200).json(lastDaySales);
+} catch (error) {
+  next(error);
+}
+}

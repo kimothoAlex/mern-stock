@@ -97,7 +97,7 @@ const DashSidebar = () => {
               </Link> */}
             </>
           )}
-          {currentUser.isAdmin && (
+          {currentUser && (
             <>
               <Link to="/dashboard?tab=sales">
                 <Sidebar.Item

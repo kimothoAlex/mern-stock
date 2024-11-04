@@ -1,9 +1,7 @@
-import React from 'react'
+import React from "react";
 
 const Home = () => {
-  return (
-    <div>Home</div>
-  )
-}
+  return <img className=" w-full h-screen " src="/Alin.jpg" alt="" />;
+};
 
-export default Home
+export default Home;

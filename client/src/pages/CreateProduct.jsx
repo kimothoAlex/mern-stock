@@ -114,6 +114,7 @@ const CreateProduct = () => {
             <option value="750ml">750ml</option>
             <option value="350ml">350ml</option>
             <option value="250ml">250ml</option>
+            <option value="125ml">125ml</option>
           </Select>
         </div>
         <div className="flex items-center justify-between border-4 border-teal-500 border-dotted p-3">
