@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { app } from "../fierbase";
 import { getStorage, ref, getDownloadURL } from "firebase/storage";
 const Home = () => {
