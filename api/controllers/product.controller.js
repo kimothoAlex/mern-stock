@@ -91,7 +91,7 @@ export const updateproduct = async (req, res, next) => {
           category: req.body.category,
           price: req.body.price,
           quantity: req.body.quantity,
-          image: req.body.image,
+          imageUrl: req.body.imageUrl,
         },
       },
       { new: true }
