@@ -19,6 +19,7 @@ const UpdateProduct = () => {
   const [imageFileUrl, setImageFileUrl] = useState(null);
   const [formData, setFormData] = useState({});
   const [updateError, setUpdateError] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
   const { productId } = useParams();
   console.log(formData);
 
@@ -55,6 +56,7 @@ const UpdateProduct = () => {
         return;
       }
       setImageUploadError(null);
+      setImageUploading(true);
       const storage = getStorage(app);
       const fileName = new Date().getTime() + "-" + file.name;
       const storageRef = ref(storage, fileName);
@@ -69,13 +71,15 @@ const UpdateProduct = () => {
         (error) => {
           setImageUploadError("Image upload failed");
           setImageUploadProgress(null);
+          setImageUploading(false);
         },
         () => {
           getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
             setImageFileUrl(downloadURL);
             setImageUploadProgress(null);
             setImageUploadError(null);
-            setFormData({ ...formData, image: downloadURL });
+            setFormData({ ...formData, imageUrl: downloadURL });
+            setImageUploading(false);
           });
         }
       );
@@ -87,6 +91,10 @@ const UpdateProduct = () => {
   };
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (imageUploading) {
+      setImageUploadError(" Please wait for image to upload");
+      return;
+    }
     try {
       const res = await fetch(`/api/product/update/${formData._id}`, {
         method: "PUT",
