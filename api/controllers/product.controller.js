@@ -161,3 +161,24 @@ export const aggProducts = async (req, res, next) => {
     next(errorHandler(500, "Error retrieving sales ranks"));
   }
 };
+
+export const lowStockProducts = async (req, res, next)=>{
+  try {
+    const reorderPoint = 3;
+    const products = await Product.find({ quantity: { $lt: reorderPoint } });
+    const reducedProducts = products.reduce((acc, product) => {
+      acc[product.name] = product.quantity;
+      return acc;
+    }, {});
+    const lowStockProducts = Object.entries(reducedProducts).map(
+      (productName) => productName[0]
+    );
+    if (lowStockProducts.length > 0) {
+      res.status(200).json({lowStockProducts});
+    }
+
+    
+  } catch (error) {
+    next(errorHandler(500, "Error retrieving products"));
+  }
+}

@@ -6,7 +6,7 @@ import userRoutes from './routes/user.route.js';
 import productRoutes from "./routes/product.route.js";
 import salesRoutes from "./routes/sales.route.js"
 import cookieParser from "cookie-parser";
-import sseServer from "./controllers/sseServer.js"
+// import sseServer from "./controllers/sseServer.js"
 import cors from "cors"
 import path from "path"
 dotenv.config();
@@ -36,7 +36,7 @@ app.use("/api/auth", authRoutes);
 app.use('/api/user', userRoutes);
 app.use("/api/product",productRoutes);
 app.use("/api/sale",salesRoutes);
-sseServer(app);
+// sseServer(app);
 
 app.use(express.static(path.join(_dirname, "/client/dist")));
 app.get("*", (req,res)=>{

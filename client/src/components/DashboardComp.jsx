@@ -46,6 +46,9 @@ const DashboardComp = () => {
         const lastDayData = await fetch("/api/sale/total/last-day");
         const lastWeekData = await fetch("/api/sale/total/last-week");
         const lastMonthData = await fetch("/api/sale/total/last-month");
+        
+        
+
 
         const lastDayTotalSales = await lastDayData.json();
         if (lastDayData.ok) {
@@ -83,14 +86,23 @@ const DashboardComp = () => {
   }, [currentUser]);
 
   useEffect(() => {
-    const eventSource = new EventSource("http://localhost:5000/stock-updates");
-
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setLowStockProducts(data.lowStockProducts);
-    };
+   
+    const lowStock = async () => {
+      try {
+        const lowStockP = await fetch("/api/product/lowStockProducts");
+        const data = await lowStockP.json();
+        if (lowStockP.ok) {
+          setLowStockProducts(data.lowStockProducts);
+        }
+      } catch (error) {
+        console.log(error.message);
+      }
+     
+    }
     
-    return () => eventSource.close(); // Cleanup: Close connection on unmount
+   if (currentUser.isAdmin) {
+    lowStock();
+   }
   }, []);
 
   useEffect(()=>{
