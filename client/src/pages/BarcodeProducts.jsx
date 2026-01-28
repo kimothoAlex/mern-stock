@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Label, TextInput, Spinner, Modal } from "flowbite-react";
 import { enqueueSnackbar } from "notistack";
-
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 const emptyForm = {
   barcode: "",
   name: "",
@@ -75,10 +75,10 @@ useEffect(() => {
 
       // Flowbite modal mount timing
       await waitForElement("qr-reader");
-
-      const mod = await import("html5-qrcode");
-      const Html5Qrcode = mod.Html5Qrcode;
-      const Html5QrcodeSupportedFormats = mod.Html5QrcodeSupportedFormats;
+      await new Promise((r) => setTimeout(r, 150));
+      // const mod = await import("html5-qrcode");
+      // const Html5Qrcode = mod.Html5Qrcode;
+      // const Html5QrcodeSupportedFormats = mod.Html5QrcodeSupportedFormats;
 
       if (cancelled) return;
 
@@ -139,6 +139,21 @@ useEffect(() => {
     stopScanner();
   };
 }, [openCamera]);
+
+const requestCameraPermission = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: false,
+    });
+    // stop immediately – we only want permission
+    stream.getTracks().forEach((t) => t.stop());
+    return true;
+  } catch (e) {
+    setError("Camera permission denied or not available.");
+    return false;
+  }
+};
 
   const findByBarcode = async (overrideCode) => {
     const code = (overrideCode ?? barcodeInput).trim();
@@ -275,9 +290,16 @@ useEffect(() => {
       <div className="bg-white dark:bg-gray-800 border rounded-lg p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Scan / Lookup Barcode</h2>
-          <Button color="light" onClick={() => setOpenCamera(true)}>
-            Scan with Phone Camera
-          </Button>
+          <Button
+  color="light"
+  onClick={async () => {
+    setError("");
+    const ok = await requestCameraPermission();
+    if (ok) setOpenCamera(true);
+  }}
+>
+  Scan with Phone Camera
+</Button>
         </div>
 
         <div className="flex gap-2 items-end">
