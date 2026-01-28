@@ -109,15 +109,24 @@ useEffect(() => {
           ],
         },
         async (decodedText) => {
-          if (!decodedText) return;
+if (!decodedText) return;
 
-          await stopScanner();
-          setOpenCamera(false);
 
-          setBarcodeInput(decodedText);
-          enqueueSnackbar("Scanned!", { variant: "success" });
-          await findByBarcode(decodedText);
-        },
+console.log("✅ SCANNED:", decodedText);
+setBarcodeInput(decodedText);
+enqueueSnackbar("Scanned!", { variant: "success" });
+
+
+// stop + close (don’t await to avoid race)
+stopScanner();
+setOpenCamera(false);
+
+
+// wait a bit for modal to close then lookup
+setTimeout(() => {
+findByBarcode(decodedText);
+}, 300);
+},
         () => {}
       );
 
