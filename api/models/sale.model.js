@@ -1,46 +1,46 @@
 import mongoose from "mongoose";
-import Product from "./product.model.js";
 
-const saleSchema = new mongoose.Schema({
-    productId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product', // Reference the Product model
-      required: true,
+const saleItemSchema = new mongoose.Schema(
+  {
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+    productName: { type: String, required: true },
+    barcode: { type: String, default: "" },
+    pricePerUnit: { type: Number, required: true },
+    quantity: { type: Number, required: true, min: 1 },
+    totalPrice: { type: Number, required: true },
+  },
+  { _id: false }
+);
+
+const saleSchema = new mongoose.Schema(
+  {
+    registerId: { type: mongoose.Schema.Types.ObjectId, ref: "Register", required: true },
+cashierId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    receiptNo: { type: String, unique: true, required: true },
+
+    items: { type: [saleItemSchema], required: true },
+
+    subtotal: { type: Number, required: true },
+    discount: { type: Number, default: 0 },
+    total: { type: Number, required: true },
+
+    payment: {
+      method: { type: String, enum: ["CASH", "MPESA"], required: true },
+      amountPaid: { type: Number, required: true },
+      change: { type: Number, default: 0 },
+      // mpesaCode: { type: String, default: "" },
     },
-    quantity: { type: Number, required: true },
-    pricePerUnit: { type: Number, required: true }, // Price at the time of sale
-    totalPrice: { type: Number }, // Calculated (quantity * pricePerUnit)
-    productName: String, // Optional
-    dateSold: { type: Date, default: Date.now }, // Date of sale
-  },{ timestamps: true });
-  
-  // Pre-save hook to calculate totalPrice before saving
-  saleSchema.pre('save', async function (next) {
-    this.totalPrice = this.quantity * this.pricePerUnit;
-    next();
-  });
 
-  saleSchema.pre('save', async function (next) {
-    const productId = this.productId;
-    const quantityToSell = this.quantity;
-  
-    try {
-      const product = await Product.findByIdAndUpdate(
-        productId,
-        { $inc: { quantity: -quantityToSell } }, // Decrement quantity
-        { new: true } // Return the updated product
-      );
-  
-      if (!product) {
-        throw new Error('Product not found');
-      }
-  
-      next(); // Proceed to the next pre-save hook (if any)
-    } catch (err) {
-      next(err); // Handle errors
-    }
-  });
-  
-  const Sale = mongoose.model('Sale', saleSchema);
-   
-  export default Sale;
+    dateSold: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+
+saleSchema.pre("validate", function (next) {
+  if (!this.receiptNo) {
+    this.receiptNo = `RCT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  }
+  next();
+});
+
+export default mongoose.model("Sale", saleSchema);

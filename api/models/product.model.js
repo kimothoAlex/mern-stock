@@ -6,13 +6,14 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    name: { type: String, required: true, unique: true }, // Ensure unique names
+    name: { type: String, required: true }, // Ensure unique names
     type: { type: String, required: true }, // (e.g., Wine, Spirit)
     category: { type: String, required: true },
     vintage: Number, // For wines
     yearDistilled: Number, // For spirits
     price: { type: Number, required: true },
     quantity: { type: Number, required: true, default: 0 },
+    barcode: { type: String, unique: true, sparse: true, index: true },
     inStock: { type: Boolean, default: true }, // Track stock availability
     imageUrl: {
       type: String,

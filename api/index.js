@@ -3,7 +3,8 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth.route.js";
 import userRoutes from './routes/user.route.js';
-import productRoutes from "./routes/product.route.js";
+import productRoutes from "./routes/product.route.js"
+import registerRoutes from "./routes/register.route.js";;
 import salesRoutes from "./routes/sales.route.js"
 import cookieParser from "cookie-parser";
 // import sseServer from "./controllers/sseServer.js"
@@ -36,6 +37,7 @@ app.use("/api/auth", authRoutes);
 app.use('/api/user', userRoutes);
 app.use("/api/product",productRoutes);
 app.use("/api/sale",salesRoutes);
+app.use("/api/register", registerRoutes);
 // sseServer(app);
 
 app.use(express.static(path.join(_dirname, "/client/dist")));
