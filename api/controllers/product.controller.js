@@ -2,7 +2,7 @@ import Product from "../models/product.model.js";
 import { errorHandler } from "../utils/error.js";
 
 export const create = async (req, res, next) => {
-  // barcode is now OPTIONAL
+  // barcode OPTIONAL
   if (
     !req.body.name ||
     !req.body.category ||
@@ -12,8 +12,10 @@ export const create = async (req, res, next) => {
     return next(errorHandler(400, "Please provide all required fields"));
   }
 
-  const slug = String(req.body.name)
-    .trim()
+  const name = String(req.body.name).trim();
+  const category = String(req.body.category).trim();
+
+  const slug = name
     .split(" ")
     .join("-")
     .toLowerCase()
@@ -21,28 +23,68 @@ export const create = async (req, res, next) => {
 
   try {
     // Friendly duplicate checks
-    const existingName = await Product.findOne({ name: req.body.name.trim() });
+    const existingName = await Product.findOne({ name });
     if (existingName) return next(errorHandler(400, "Product name already exists"));
 
-    // Only check barcode if provided
-    if (req.body.barcode && String(req.body.barcode).trim() !== "") {
-      const existingBarcode = await Product.findOne({ barcode: String(req.body.barcode).trim() });
+    const barcode =
+      req.body.barcode && String(req.body.barcode).trim() !== ""
+        ? String(req.body.barcode).trim()
+        : undefined;
+
+    if (barcode) {
+      const existingBarcode = await Product.findOne({ barcode });
       if (existingBarcode) return next(errorHandler(400, "Barcode already exists"));
     }
 
+    // Cast numeric fields
+    const price = Number(req.body.price);
+    const quantity = Number(req.body.quantity);
+
+    if (Number.isNaN(price) || price < 0)
+      return next(errorHandler(400, "Valid price is required"));
+    if (Number.isNaN(quantity) || quantity < 0)
+      return next(errorHandler(400, "Valid quantity is required"));
+
+    const costPrice =
+      req.body.costPrice === undefined || req.body.costPrice === null || req.body.costPrice === ""
+        ? undefined
+        : Number(req.body.costPrice);
+
+    const reorderLevel =
+      req.body.reorderLevel === undefined || req.body.reorderLevel === null || req.body.reorderLevel === ""
+        ? undefined
+        : Number(req.body.reorderLevel);
+
+    if (costPrice !== undefined && (Number.isNaN(costPrice) || costPrice < 0))
+      return next(errorHandler(400, "Valid cost price is required"));
+
+    if (reorderLevel !== undefined && (Number.isNaN(reorderLevel) || reorderLevel < 0))
+      return next(errorHandler(400, "Valid reorder level is required"));
+
     const newProduct = new Product({
-      ...req.body,
-      name: req.body.name.trim(),
-      barcode: req.body.barcode?.trim() || undefined, // optional
-      type: req.body.type?.trim() || "general",       // default type
-      slug,
       userId: req.user.id,
-      price: Number(req.body.price),
-      quantity: Number(req.body.quantity),
+      slug,
+
+      name,
+      category,
+
+      type: req.body.type ? String(req.body.type).trim() : "general",
+
+      barcode,
+
+      price,
+      quantity,
+
+      unit: req.body.unit ? String(req.body.unit).trim() : "pcs",
+      costPrice,
+      reorderLevel,
+
+      description: req.body.description ? String(req.body.description).trim() : "",
+      imageUrl: req.body.imageUrl ? String(req.body.imageUrl).trim() : undefined,
     });
 
     const savedProduct = await newProduct.save();
-    res.status(201).json(savedProduct);
+    return res.status(201).json(savedProduct);
   } catch (error) {
     next(error);
   }
@@ -58,7 +100,7 @@ export const getproducts = async (req, res, next) => {
       ...(req.query.type && { type: req.query.type }),
       ...(req.query.slug && { slug: req.query.slug }),
       ...(req.query.productId && { _id: req.query.productId }),
-      ...(req.query.barcode && { barcode: req.query.barcode }),
+      ...(req.query.barcode && { barcode: String(req.query.barcode).trim() }),
       ...(req.query.searchTerm && {
         name: { $regex: req.query.searchTerm, $options: "i" },
       }),
@@ -94,27 +136,47 @@ export const deleteproduct = async (req, res, next) => {
 
 export const updateproduct = async (req, res, next) => {
   if (!req.user.isAdmin) {
-    return next(
-      errorHandler(403, "You are not allowed to update this product")
-    );
+    return next(errorHandler(403, "You are not allowed to update this product"));
   }
+
   try {
+    const update = {
+      name: req.body.name,
+      type: req.body.type,
+      category: req.body.category,
+      imageUrl: req.body.imageUrl,
+      barcode: req.body.barcode,
+
+      // UI fields
+      unit: req.body.unit,
+      description: req.body.description,
+
+      // numeric (cast)
+      price: req.body.price,
+      quantity: req.body.quantity,
+      costPrice: req.body.costPrice,
+      reorderLevel: req.body.reorderLevel,
+    };
+
+    // Cast numbers safely
+    ["price", "quantity", "costPrice", "reorderLevel"].forEach((k) => {
+      if (update[k] !== undefined && update[k] !== null && update[k] !== "") {
+        update[k] = Number(update[k]);
+      } else {
+        delete update[k];
+      }
+    });
+
+    // remove undefined so you don’t overwrite existing values
+    Object.keys(update).forEach((k) => update[k] === undefined && delete update[k]);
+
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.productId,
-      {
-        $set: {
-          name: req.body.name,
-          type: req.body.type,
-          category: req.body.category,
-          price: req.body.price,
-          quantity: req.body.quantity,
-          imageUrl: req.body.imageUrl,
-          barcode: req.body.barcode,
-        },
-      },
-      { new: true }
+      { $set: update },
+      { new: true, runValidators: true }
     );
-    res.status(200).json(updatedProduct);
+
+    return res.status(200).json(updatedProduct);
   } catch (error) {
     next(error);
   }
@@ -193,23 +255,30 @@ next(errorHandler(500, "Error retrieving sales ranks"));
 }
 };
 
-export const lowStockProducts = async (req, res, next)=>{
+export const lowStockProducts = async (req, res, next) => {
   try {
-    const reorderPoint = 9;
-    const products = await Product.find({ quantity: { $lt: reorderPoint } });
+    const DEFAULT_REORDER_LEVEL = 9;
+
+    const products = await Product.find({
+      // Only include products where quantity < (reorderLevel or default)
+      $expr: {
+        $lt: [
+          "$quantity",
+          { $ifNull: ["$reorderLevel", DEFAULT_REORDER_LEVEL] },
+        ],
+      },
+    }).select("name quantity reorderLevel");
+
     const reducedProducts = products.reduce((acc, product) => {
       acc[product.name] = product.quantity;
       return acc;
     }, {});
-    const lowStockProducts = Object.entries(reducedProducts).map(
-      (productName) => productName[0]
-    );
-    if (lowStockProducts.length > 0) {
-      res.status(200).json({lowStockProducts});
-    }
 
-    
+    const lowStockProducts = Object.keys(reducedProducts);
+
+    // Always respond (even if empty) so frontend doesn't hang
+    return res.status(200).json({ lowStockProducts });
   } catch (error) {
-    next(errorHandler(500, "Error retrieving products"));
+    return next(errorHandler(500, "Error retrieving products"));
   }
-}
+};
