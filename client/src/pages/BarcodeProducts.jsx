@@ -91,8 +91,8 @@ useEffect(() => {
           fps: 12,
 
           // Smaller box tends to work better for 1D barcodes
-          qrbox: { width: 220, height: 220 },
-
+          qrbox: { width: 320, height: 120 },
+          aspectRatio: 1.777,
           // BIG one for Android:
           experimentalFeatures: {
             useBarCodeDetectorIfSupported: true,
