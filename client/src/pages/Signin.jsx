@@ -19,7 +19,7 @@ export default function SignIn() {
   const navigate = useNavigate();
   useEffect(() => {
     const storage = getStorage(app);
-    const fileRef = ref(storage, 'gs://mern-stock.appspot.com/Alin.jpg'); // Replace with your file path
+    const fileRef = ref(storage, 'gs://mern-stock.appspot.com/MMinimart.jpeg'); // Replace with your file path
 
     getDownloadURL(fileRef)
       .then((url) => {

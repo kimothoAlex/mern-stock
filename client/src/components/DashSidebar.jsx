@@ -13,6 +13,7 @@ import {
   HiOutlineUserGroup,
   HiUser,
 } from "react-icons/hi";
+import { MdOutlinePointOfSale } from "react-icons/md";
 import { BsCashCoin } from "react-icons/bs";
 import { LiaProductHunt } from "react-icons/lia";
 import React, { useEffect, useState } from "react";
@@ -86,15 +87,15 @@ const DashSidebar = () => {
                   Products
                 </SidebarItem>
               </Link>
-              {/* <Link to='/dashboard?tab=comments'>
+              <Link to='/dashboard?tab=POS'>
                 <Sidebar.Item
-                  active={tab === 'comments'}
-                  icon={HiAnnotation}
-                  as='div'
+                  active={tab === 'POS'}
+                  icon={MdOutlinePointOfSale}
+                  as="div"
                 >
-                  Comments
+                  POS
                 </Sidebar.Item>
-              </Link> */}
+              </Link>
             </>
           )}
           {currentUser && (

@@ -35,7 +35,7 @@ const Header = () => {
       setSearchTerm(searchTermFromUrl);
     }
     const storage = getStorage(app);
-    const fileRef = ref(storage, "gs://mern-stock.appspot.com/Alin.jpg");
+    const fileRef = ref(storage, "gs://mern-stock.appspot.com/MMinimart.jpeg");
     getDownloadURL(fileRef)
       .then((url) => {
         setImageUrl(url);
@@ -136,6 +136,13 @@ const Header = () => {
           ? currentUser.isAdmin && (
               <Navbar.Link active={path === "/create-product"} as={"div"}>
                 <Link to="/create-product">Create Product</Link>
+              </Navbar.Link>
+            )
+          : ""}
+        {currentUser
+          ? currentUser.isAdmin && (
+              <Navbar.Link active={path === "/register-report"} as={"div"}>
+                <Link to="/register-report">Daily Register Report</Link>
               </Navbar.Link>
             )
           : ""}

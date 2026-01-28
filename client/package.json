@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+        "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:pack": "npm run build && electron-builder",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -14,8 +16,10 @@
     "@reduxjs/toolkit": "^2.2.1",
     "firebase": "^10.9.0",
     "flowbite-react": "^0.7.3",
+    "html5-qrcode": "^2.3.8",
     "moment": "^2.30.1",
     "notistack": "^3.0.1",
+    "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.2.0",
     "react-circular-progressbar": "^2.1.0",
@@ -30,12 +34,33 @@
     "@types/react-dom": "^18.2.21",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.18",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.4.0",
     "eslint": "^8.57.0",
     "eslint-plugin-react": "^7.34.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
     "postcss": "^8.4.36",
     "tailwindcss": "^3.4.1",
-    "vite": "^5.1.6"
+    "vite": "^5.1.6",
+    "wait-on": "^9.0.3"
+  },
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "com.alin.pos",
+    "productName": "MiniMarket POS",
+    "directories": { "output": "release" },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "backend/**",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "backend/**"
+    ],
+    "win": { "target": "nsis" }
   }
 }

@@ -1,33 +1,54 @@
 import { useState } from "react";
 import { enqueueSnackbar } from "notistack";
-import {
-  Alert,
-  Button,
-  FileInput,
-  Label,
-  Select,
-  Spinner,
-  TextInput,
-} from "flowbite-react";
-import {
-  getDownloadURL,
-  getStorage,
-  ref,
-  uploadBytesResumable,
-} from "firebase/storage";
-
+import { Alert, Button, FileInput, Label, Select, TextInput, Textarea } from "flowbite-react";
+import { getDownloadURL, getStorage, ref, uploadBytesResumable } from "firebase/storage";
 import { app } from "../fierbase";
 import { CircularProgressbar } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+
+const DEFAULT_CATEGORIES = [
+  "Grocery",
+  "Drinks",
+  "Snacks",
+  "Dairy",
+  "Bakery",
+  "Meat",
+  "Fruits & Vegetables",
+  "Cleaning",
+  "Personal Care",
+  "Stationery",
+  "Electronics",
+  "Hardware",
+  "Other",
+];
+
+const UNITS = ["pcs", "kg", "g", "ltr", "ml", "box", "pack"];
 
 const CreateProduct = () => {
   const [file, setFile] = useState(null);
   const [imageUploadProgress, setImageUploadProgress] = useState(null);
   const [imageUploadError, setImageUploadError] = useState(null);
-  const [formData, setFormData] = useState({});
   const [publishError, setPublishError] = useState(null);
+  const [useCustomCategory, setUseCustomCategory] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    barcode: "",
+    category: "",
+    price: "",
+    quantity: "",
+    unit: "pcs",
+    costPrice: "",
+    reorderLevel: "",
+    description: "",
+    imageUrl: "",
+    // type removed (optional). If your backend requires it, set a default like "general".
+    type: "general",
+  });
+
   const navigate = useNavigate();
+
   const handleUpdloadImage = async () => {
     try {
       if (!file) {
@@ -39,14 +60,14 @@ const CreateProduct = () => {
       const fileName = new Date().getTime() + "-" + file.name;
       const storageRef = ref(storage, fileName);
       const uploadTask = uploadBytesResumable(storageRef, file);
+
       uploadTask.on(
         "state_changed",
         (snapshot) => {
-          const progress =
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setImageUploadProgress(progress.toFixed(0));
         },
-        (error) => {
+        () => {
           setImageUploadError("Image upload failed");
           setImageUploadProgress(null);
         },
@@ -54,7 +75,7 @@ const CreateProduct = () => {
           getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
             setImageUploadProgress(null);
             setImageUploadError(null);
-            setFormData({ ...formData, image: downloadURL });
+            setFormData((prev) => ({ ...prev, imageUrl: downloadURL }));
           });
         }
       );
@@ -68,128 +89,228 @@ const CreateProduct = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setPublishError(null);
+
+      // Basic front-end validation
+      if (!formData.name.trim()) return setPublishError("Product name is required");
+      if (!formData.category.trim()) return setPublishError("Category is required");
+      if (formData.price === "" || Number(formData.price) < 0) return setPublishError("Valid price is required");
+      if (formData.quantity === "" || Number(formData.quantity) < 0) return setPublishError("Valid quantity is required");
+
+      // Send numeric fields as numbers
+      const payload = {
+        ...formData,
+        price: Number(formData.price),
+        quantity: Number(formData.quantity),
+        costPrice: formData.costPrice === "" ? undefined : Number(formData.costPrice),
+        reorderLevel: formData.reorderLevel === "" ? undefined : Number(formData.reorderLevel),
+        barcode: formData.barcode.trim() || undefined, // optional
+      };
+
       const res = await fetch("/api/product/create", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
+
       const data = await res.json();
       if (!res.ok) {
-        setPublishError(data.message);
+        setPublishError(data.message || "Failed to create product");
         return;
       }
 
-      if (res.ok) {
-        enqueueSnackbar("Product Created Successfully", { variant: "success" });
-        setPublishError(null);
-        navigate(`/product/${data.slug}`);
-      }
+      enqueueSnackbar("Product Created Successfully", { variant: "success" });
+      navigate(`/product/${data.slug}`);
     } catch (error) {
       setPublishError("Something went wrong");
     }
   };
+
   return (
     <div className="p-3 max-w-3xl mx-auto min-h-screen">
-      <h1 className="text-center my-7 font-semibold text-3xl">
-        Create Product
-      </h1>
+      <div className="flex items-center justify-between my-7">
+        <h1 className="font-semibold text-3xl">Add Product</h1>
+
+        <Link to="/barcode" className="text-sm font-semibold text-teal-600 hover:underline">
+          Scan / Find Barcode
+        </Link>
+      </div>
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-4 sm:flex-row justify-between ">
+        {/* Name + Category */}
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <div className="flex-1">
+            <Label value="Product Name" />
+            <TextInput
+              type="text"
+              placeholder="e.g., Sugar 1kg"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+            />
+          </div>
+
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <Label value="Category" />
+              <button
+                type="button"
+                className="text-xs text-teal-600 hover:underline"
+                onClick={() => setUseCustomCategory((v) => !v)}
+              >
+                {useCustomCategory ? "Use dropdown" : "Custom category"}
+              </button>
+            </div>
+
+            {!useCustomCategory ? (
+              <Select
+                value={formData.category}
+                onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
+                required
+              >
+                <option value="">Select category</option>
+                {DEFAULT_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <TextInput
+                type="text"
+                placeholder="e.g., Farm inputs"
+                value={formData.category}
+                onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
+                required
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Barcode (optional) */}
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="barcode" value="Barcode (optional)" />
           <TextInput
             type="text"
-            placeholder="Name"
-            required
-            id="name"
-            className="flex-1"
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="Scan or type barcode (leave empty if none)"
+            id="barcode"
+            value={formData.barcode}
+            onChange={(e) => setFormData((p) => ({ ...p, barcode: e.target.value }))}
           />
-          <Select
-            onChange={(e) =>
-              setFormData({ ...formData, category: e.target.value })
-            }
-          >
-            <option value="uncategorized">Select a category</option>
-            <option value="750ml">750ml</option>
-            <option value="350ml">350ml</option>
-            <option value="250ml">250ml</option>
-            <option value="125ml">125ml</option>
-          </Select>
+          <p className="text-xs text-gray-500">
+            If you use a barcode scanner, click here and scan—most scanners type into the field automatically.
+          </p>
         </div>
-        <div className="flex items-center justify-between border-4 border-teal-500 border-dotted p-3">
-          <FileInput
-            type="file"
-            accept="image/*"
-            onChange={(e) => setFile(e.target.files[0])}
+
+        {/* Price + Cost + Unit */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <Label value="Selling Price" />
+            <TextInput
+              type="number"
+              placeholder="e.g., 120"
+              min="0"
+              required
+              value={formData.price}
+              onChange={(e) => setFormData((p) => ({ ...p, price: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <Label value="Cost Price (optional)" />
+            <TextInput
+              type="number"
+              placeholder="e.g., 90"
+              min="0"
+              value={formData.costPrice}
+              onChange={(e) => setFormData((p) => ({ ...p, costPrice: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <Label value="Unit" />
+            <Select
+              value={formData.unit}
+              onChange={(e) => setFormData((p) => ({ ...p, unit: e.target.value }))}
+            >
+              {UNITS.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        {/* Quantity + Reorder */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label value="Stock Quantity" />
+            <TextInput
+              type="number"
+              placeholder="e.g., 50"
+              min="0"
+              required
+              value={formData.quantity}
+              onChange={(e) => setFormData((p) => ({ ...p, quantity: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <Label value="Reorder Level (optional)" />
+            <TextInput
+              type="number"
+              placeholder="e.g., 5"
+              min="0"
+              value={formData.reorderLevel}
+              onChange={(e) => setFormData((p) => ({ ...p, reorderLevel: e.target.value }))}
+            />
+            <p className="text-xs text-gray-500">You can alert when stock goes below this number.</p>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div>
+          <Label value="Description (optional)" />
+          <Textarea
+            placeholder="Any notes (brand, size, supplier, etc.)"
+            rows={3}
+            value={formData.description}
+            onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
           />
+        </div>
+
+        {/* Image upload */}
+        {/* <div className="flex items-center justify-between border-4 border-teal-500 border-dotted p-3">
+          <FileInput type="file" accept="image/*" onChange={(e) => setFile(e.target.files[0])} />
           <Button
-            gradientDuoTone={"purpleToBlue"}
+            gradientDuoTone="purpleToBlue"
             outline
             size="sm"
             onClick={handleUpdloadImage}
             disabled={imageUploadProgress}
+            type="button"
           >
             {imageUploadProgress ? (
               <div className="w-16 h-16">
-                <CircularProgressbar
-                  value={imageUploadProgress}
-                  text={`${imageUploadProgress || 0}%`}
-                />
+                <CircularProgressbar value={imageUploadProgress} text={`${imageUploadProgress || 0}%`} />
               </div>
             ) : (
               "Upload Image"
             )}
           </Button>
-        </div>
-        <div className="flex flex-col gap-4 sm:flex-row justify-between ">
-          <TextInput
-            type="number"
-            placeholder="Price"
-            min="0"
-            required
-            id="price"
-            className="flex-1"
-            onChange={(e) =>
-              setFormData({ ...formData, price: e.target.value })
-            }
-          />
-          <Select
-            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-          >
-            <option value="uncategorized">Select type</option>
-            <option value="beer">Beer</option>
-            <option value="wine">Wine</option>
-            <option value="spirit">Spirit</option>
-            <option value="gin">Gin</option>
-            <option value="whisky">Whisky</option>
-            <option value="vodka">Vodka</option>
-            <option value="brandy">Brandy</option>
-          </Select>
-        </div>
-        <TextInput
-          type="number"
-          placeholder="Quantity"
-          min="0"
-          required
-          id="quantity"
-          className="flex-1"
-          onChange={(e) =>
-            setFormData({ ...formData, quantity: e.target.value })
-          }
-        />
+        </div> */}
+
         {imageUploadError && <Alert color="failure">{imageUploadError}</Alert>}
-        {formData.image && (
-          <img
-            src={formData.image}
-            alt="upload"
-            className="w-full h-72 object-cover"
-          />
+
+        {formData.imageUrl && (
+          <img src={formData.imageUrl} alt="upload" className="w-full h-72 object-cover" />
         )}
 
-        <Button type="submit" gradientDuoTone={"purpleToPink"}>
-          Create
+        <Button type="submit" gradientDuoTone="purpleToPink">
+          Save Product
         </Button>
+
         {publishError && (
           <Alert className="mt-5" color="failure">
             {publishError}

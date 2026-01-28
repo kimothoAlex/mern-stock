@@ -33,9 +33,11 @@ const DashboardComp = () => {
         const data = await res.json();
         if (res.ok) {
           setSales(data.sales);
+          console.log(sales);
           setLastDaySales(data.lastDaySales);
           setLastWeekSales(data.lastWeekSales);
           setLastMonthSales(data.lastMonthSales);
+          
         }
       } catch (error) {
         console.log(error.message);
@@ -173,6 +175,7 @@ const DashboardComp = () => {
           </div>
           <Table hoverable>
             <Table.Head>
+              <Table.HeadCell>Receipt Number</Table.HeadCell>
               <Table.HeadCell>Product Name</Table.HeadCell>
               <Table.HeadCell>Quantity</Table.HeadCell>
               <Table.HeadCell>Total Price</Table.HeadCell>
@@ -181,9 +184,12 @@ const DashboardComp = () => {
               sales.map((sale) => (
                 <Table.Body key={sale._id} className="divide-y">
                   <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
-                    <Table.Cell>{sale.productName}</Table.Cell>
-                    <Table.Cell>{sale.quantity}</Table.Cell>
-                    <Table.Cell>{sale.totalPrice.toLocaleString()}</Table.Cell>
+                    <Table.Cell>{sale.receiptNo}</Table.Cell>
+                    <Table.Cell>{sale.items[0].productName}</Table.Cell>
+
+                    <Table.Cell>{sale.items[0].quantity}</Table.Cell>
+                    <Table.Cell>{sale.total.toLocaleString()}</Table.Cell>
+                    
                   </Table.Row>
                 </Table.Body>
               ))}

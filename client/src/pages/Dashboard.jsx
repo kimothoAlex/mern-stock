@@ -5,6 +5,7 @@ import DashProfile from "../components/DashProfile";
 import DashProducts from "../components/DashProducts";
 import DashSales from "../components/DashSales";
 import DashboardComp from "../components/DashboardComp";
+import POS from "../components/DashPos";
 
 const Dashboard = () => {
   const location = useLocation();
@@ -26,10 +27,12 @@ const Dashboard = () => {
       {tab === "profile" && <DashProfile />}
       {/*Posts*/}
 
+
       {/* products... */}
       {tab === "products" && <DashProducts />}
       {/* sales... */}
       {tab === "sales" && <DashSales />}
+      {tab === "POS" && <POS/>}
       {/* dashboard comp */}
       {tab === "dash" && <DashboardComp />}
     </div>

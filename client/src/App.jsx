@@ -9,8 +9,11 @@ import Dashboard from "./pages/Dashboard";
 import CreateProduct from "./pages/CreateProduct";
 import ProductPage from "./pages/ProductPage";
 import UpdateProduct from "./pages/UpdateProduct";
+import DailyRegisterReport from "./pages/DailyReports";
 import IsAdminPrivateRoute from "./components/IsAdminPrivateRoute";
 import Search from "./pages/Search";
+
+import BarcodeProducts from "./pages/BarcodeProducts";
 
 const App = () => {
   return (
@@ -20,9 +23,12 @@ const App = () => {
         <Route path="/" element={<Home />} />
         <Route path="/sign-in" element={<Signin />} />
         <Route path="/sign-up" element={<Signup />} />
+        <Route path="/barcode" element={<BarcodeProducts />} />
+        
         <Route element={<PrivateRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/create-product" element={<CreateProduct />} />
+          <Route path="/register-report" element={<DailyRegisterReport />} />
         </Route>
         <Route element={< IsAdminPrivateRoute />} >
           <Route path='/update-product/:productId' element={<UpdateProduct />} />
