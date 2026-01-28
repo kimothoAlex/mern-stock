@@ -1,6 +1,6 @@
 // src/pages/BarcodeProducts.jsx
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Label, TextInput, Spinner, Modal } from "flowbite-react";
+import { Alert, Button, Label, TextInput, Spinner, Modal, Select } from "flowbite-react";
 import { enqueueSnackbar } from "notistack";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 const emptyForm = {
