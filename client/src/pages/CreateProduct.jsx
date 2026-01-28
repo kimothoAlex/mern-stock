@@ -43,7 +43,7 @@ const DEFAULT_CATEGORIES = [
   "Other",
 ];
 
-const UNITS = ["pcs", "kg", "g", "ltr", "ml", "box", "pack", "bottle", "can", "bag"];
+const UNITS = ["pcs", "kg", "g", "ltr", "ml", "box", "pack"];
 
 const CreateProduct = () => {
   const [file, setFile] = useState(null);
