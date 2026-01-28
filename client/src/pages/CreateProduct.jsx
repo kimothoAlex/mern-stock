@@ -13,17 +13,37 @@ const DEFAULT_CATEGORIES = [
   "Snacks",
   "Dairy",
   "Bakery",
-  "Meat",
+  "Meat & Poultry",
+  "Fish & Seafood",
   "Fruits & Vegetables",
-  "Cleaning",
+  "Cereals & Grains",
+  "Flour & Baking",
+  "Spices & Condiments",
+  "Cooking Oil",
+  "Sugar & Sweeteners",
+  "Tea, Coffee & Cocoa",
+  "Baby Products",
   "Personal Care",
+  "Health & Pharmacy",
+  "Beauty & Cosmetics",
+  "Cleaning",
+  "Laundry",
+  "Paper & Tissue",
   "Stationery",
   "Electronics",
+  "Phone Accessories",
+  "Home & Kitchen",
+  "Utensils",
   "Hardware",
+  "Tools",
+  "Automotive",
+  "Pet Supplies",
+  "Alcoholic Drinks",
+  "Tobacco",
   "Other",
 ];
 
-const UNITS = ["pcs", "kg", "g", "ltr", "ml", "box", "pack"];
+const UNITS = ["pcs", "kg", "g", "ltr", "ml", "box", "pack", "bottle", "can", "bag"];
 
 const CreateProduct = () => {
   const [file, setFile] = useState(null);

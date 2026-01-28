@@ -4,21 +4,62 @@ import { Alert, Button, Label, TextInput, Spinner, Modal } from "flowbite-react"
 import { enqueueSnackbar } from "notistack";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 const emptyForm = {
-  barcode: "",
   name: "",
-  type: "",
+  barcode: "",
   category: "",
   price: "",
   quantity: "",
+  unit: "pcs",
+  costPrice: "",
+  reorderLevel: "",
+  description: "",
   imageUrl: "",
+  type: "general",
 };
 
+const DEFAULT_CATEGORIES = [
+  "Grocery",
+  "Drinks",
+  "Snacks",
+  "Dairy",
+  "Bakery",
+  "Meat & Poultry",
+  "Fish & Seafood",
+  "Fruits & Vegetables",
+  "Cereals & Grains",
+  "Flour & Baking",
+  "Spices & Condiments",
+  "Cooking Oil",
+  "Sugar & Sweeteners",
+  "Tea, Coffee & Cocoa",
+  "Baby Products",
+  "Personal Care",
+  "Health & Pharmacy",
+  "Beauty & Cosmetics",
+  "Cleaning",
+  "Laundry",
+  "Paper & Tissue",
+  "Stationery",
+  "Electronics",
+  "Phone Accessories",
+  "Home & Kitchen",
+  "Utensils",
+  "Hardware",
+  "Tools",
+  "Automotive",
+  "Pet Supplies",
+  "Alcoholic Drinks",
+  "Tobacco",
+  "Other",
+];
+
+const UNITS = ["pcs", "kg", "g", "ltr", "ml", "box", "pack", "bottle", "can", "bag"];
 export default function BarcodeProducts() {
   const barcodeRef = useRef(null);
 
   const [barcodeInput, setBarcodeInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-
+const [useCustomCategory, setUseCustomCategory] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -232,14 +273,18 @@ const requestCameraPermission = async () => {
       setCreateLoading(true);
 
       const payload = {
-        barcode: form.barcode.trim(),
-        name: form.name.trim(),
-        type: form.type.trim(),
-        category: form.category.trim(),
-        price: Number(form.price),
-        quantity: Number(form.quantity),
-        imageUrl: form.imageUrl?.trim() || "",
-      };
+  barcode: form.barcode.trim(),
+  name: form.name.trim(),
+  type: (form.type || "general").trim(),
+  category: form.category.trim(),
+  price: Number(form.price),
+  quantity: Number(form.quantity),
+  unit: form.unit || "pcs",
+  costPrice: form.costPrice === "" ? undefined : Number(form.costPrice),
+  reorderLevel: form.reorderLevel === "" ? undefined : Number(form.reorderLevel),
+  description: form.description?.trim() || "",
+  imageUrl: form.imageUrl?.trim() || "",
+};
 
       const res = await fetch("/api/product/create", {
         method: "POST",
@@ -350,88 +395,204 @@ const requestCameraPermission = async () => {
       </div>
 
       {/* ADD PRODUCT */}
-      <div className="bg-white dark:bg-gray-800 border rounded-lg p-4 space-y-4">
-        <h2 className="text-lg font-semibold">Add Product</h2>
+      {/* ADD PRODUCT (matches CreateProduct UI) */}
+<div className="bg-white dark:bg-gray-800 border rounded-lg p-4 space-y-4">
+  <h2 className="text-lg font-semibold">Add Product</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <Label htmlFor="barcode" value="Barcode" />
-            <TextInput id="barcode" value={form.barcode} onChange={updateForm} />
-          </div>
-
-          <div>
-            <Label htmlFor="name" value="Name" />
-            <TextInput id="name" value={form.name} onChange={updateForm} />
-          </div>
-
-          <div>
-            <Label htmlFor="type" value="Type" />
-            <TextInput id="type" value={form.type} onChange={updateForm} />
-          </div>
-
-          <div>
-            <Label htmlFor="category" value="Category" />
-            <TextInput
-              id="category"
-              value={form.category}
-              onChange={updateForm}
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="price" value="Price (KES)" />
-            <TextInput
-              id="price"
-              type="number"
-              min={0}
-              value={form.price}
-              onChange={updateForm}
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="quantity" value="Quantity" />
-            <TextInput
-              id="quantity"
-              type="number"
-              min={0}
-              value={form.quantity}
-              onChange={updateForm}
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <Label htmlFor="imageUrl" value="Image URL (optional)" />
-            <TextInput
-              id="imageUrl"
-              value={form.imageUrl}
-              onChange={updateForm}
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button
-            color="light"
-            onClick={() => {
-              setForm(emptyForm);
-              setError("");
-            }}
-          >
-            Clear
-          </Button>
-
-          <Button onClick={createProduct} disabled={createLoading}>
-            {createLoading ? (
-              <span className="flex items-center gap-2">
-                <Spinner size="sm" /> Saving
-              </span>
-            ) : (
-              "Add Product"
-            )}
-          </Button>
-        </div>
+  <form
+    onSubmit={(e) => {
+      e.preventDefault();
+      createProduct();
+    }}
+    className="flex flex-col gap-4"
+  >
+    {/* Name + Category */}
+    <div className="flex flex-col gap-4 sm:flex-row">
+      <div className="flex-1">
+        <Label value="Product Name" />
+        <TextInput
+          id="name"
+          type="text"
+          placeholder="e.g., Sugar 1kg"
+          required
+          value={form.name}
+          onChange={updateForm}
+        />
       </div>
+
+      <div className="flex-1">
+        <div className="flex items-center justify-between">
+          <Label value="Category" />
+          <button
+            type="button"
+            className="text-xs text-teal-600 hover:underline"
+            onClick={() => setUseCustomCategory((v) => !v)}
+          >
+            {useCustomCategory ? "Use dropdown" : "Custom category"}
+          </button>
+        </div>
+
+        {!useCustomCategory ? (
+          <Select
+            id="category"
+            value={form.category}
+            onChange={updateForm}
+            required
+          >
+            <option value="">Select category</option>
+            {DEFAULT_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <TextInput
+            id="category"
+            type="text"
+            placeholder="e.g., Farm inputs"
+            required
+            value={form.category}
+            onChange={updateForm}
+          />
+        )}
+      </div>
+    </div>
+
+    {/* Barcode */}
+    <div className="flex flex-col gap-2">
+      <Label htmlFor="barcode" value="Barcode" />
+      <TextInput
+        id="barcode"
+        type="text"
+        placeholder="Scan or type barcode"
+        required
+        value={form.barcode}
+        onChange={updateForm}
+      />
+      <p className="text-xs text-gray-500">
+        Tip: USB scanners usually type into the input automatically.
+      </p>
+    </div>
+
+    {/* Price + Cost + Unit */}
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <Label value="Selling Price (KES)" />
+        <TextInput
+          id="price"
+          type="number"
+          placeholder="e.g., 120"
+          min="0"
+          required
+          value={form.price}
+          onChange={updateForm}
+        />
+      </div>
+
+      <div>
+        <Label value="Cost Price (optional)" />
+        <TextInput
+          id="costPrice"
+          type="number"
+          placeholder="e.g., 90"
+          min="0"
+          value={form.costPrice}
+          onChange={updateForm}
+        />
+      </div>
+
+      <div>
+        <Label value="Unit" />
+        <Select id="unit" value={form.unit} onChange={updateForm}>
+          {UNITS.map((u) => (
+            <option key={u} value={u}>
+              {u}
+            </option>
+          ))}
+        </Select>
+      </div>
+    </div>
+
+    {/* Quantity + Reorder */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <Label value="Stock Quantity" />
+        <TextInput
+          id="quantity"
+          type="number"
+          placeholder="e.g., 50"
+          min="0"
+          required
+          value={form.quantity}
+          onChange={updateForm}
+        />
+      </div>
+
+      <div>
+        <Label value="Reorder Level (optional)" />
+        <TextInput
+          id="reorderLevel"
+          type="number"
+          placeholder="e.g., 5"
+          min="0"
+          value={form.reorderLevel}
+          onChange={updateForm}
+        />
+        <p className="text-xs text-gray-500">
+          You can alert when stock goes below this number.
+        </p>
+      </div>
+    </div>
+
+    {/* Description */}
+    <div>
+      <Label value="Description (optional)" />
+      <Textarea
+        id="description"
+        placeholder="Any notes (brand, size, supplier, etc.)"
+        rows={3}
+        value={form.description}
+        onChange={updateForm}
+      />
+    </div>
+
+    {/* Image URL */}
+    <div>
+      <Label htmlFor="imageUrl" value="Image URL (optional)" />
+      <TextInput
+        id="imageUrl"
+        value={form.imageUrl}
+        onChange={updateForm}
+        placeholder="https://..."
+      />
+    </div>
+
+    <div className="flex justify-end gap-2">
+      <Button
+        color="light"
+        type="button"
+        onClick={() => {
+          setForm(emptyForm);
+          setUseCustomCategory(false);
+          setError("");
+        }}
+      >
+        Clear
+      </Button>
+
+      <Button type="submit" gradientDuoTone="purpleToPink" disabled={createLoading}>
+        {createLoading ? (
+          <span className="flex items-center gap-2">
+            <Spinner size="sm" /> Saving
+          </span>
+        ) : (
+          "Save Product"
+        )}
+      </Button>
+    </div>
+  </form>
+</div>
 
       {/* FIND PRODUCTS */}
       <div className="bg-white dark:bg-gray-800 border rounded-lg p-4 space-y-3">
