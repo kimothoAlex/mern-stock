@@ -244,13 +244,24 @@ export const exportSessionCsv = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+// controllers/mpesa.controller.js
+import MpesaSession from "../models/MpesaSession.js";
+import MpesaTxn from "../models/MpesaTxn.js";
+
 export const closeSession = async (req, res) => {
   try {
     const cashierId = req.user.id;
-    const {  closingCashCounted, closingFloatActual, notes } = req.body;
+    const { closingCashCounted, closingFloatActual, notes } = req.body;
+
+    const closingCash = Number(closingCashCounted);
+    const closingFloat = Number(closingFloatActual);
+
+    if (!Number.isFinite(closingCash) || !Number.isFinite(closingFloat)) {
+      return res.status(400).json({ message: "Closing cash and float must be valid numbers." });
+    }
 
     const session = await MpesaSession.findOne({ cashierId, status: "OPEN" });
-    if (!session) return res.status(400).json({ message: "No OPEN session to close." });
+    if (!session) return res.status(400).json({ message: "No OPEN session found." });
 
     // Sum deltas for this session
     const sums = await MpesaTxn.aggregate([
@@ -267,20 +278,18 @@ export const closeSession = async (req, res) => {
 
     const totalCashDelta = sums?.[0]?.totalCashDelta ?? 0;
     const totalFloatDelta = sums?.[0]?.totalFloatDelta ?? 0;
+    const txCount = sums?.[0]?.txCount ?? 0;
 
-    const expectedCash = Number(session.openingCashInHand) + Number(totalCashDelta);
-    const expectedFloat = Number(session.openingFloat) + Number(totalFloatDelta);
+    const openingCash = Number(session.openingCashInHand || 0);
+    const openingFloat = Number(session.openingFloat || 0);
 
-    const closingCash = Number(closingCashCounted);
-    const closingFloat = Number(closingFloatActual);
-
-    if (!Number.isFinite(closingCash) || !Number.isFinite(closingFloat)) {
-      return res.status(400).json({ message: "Closing cash/float must be valid numbers." });
-    }
+    const expectedCash = openingCash + totalCashDelta;
+    const expectedFloat = openingFloat + totalFloatDelta;
 
     const cashVariance = closingCash - expectedCash;
     const floatVariance = closingFloat - expectedFloat;
 
+    // ✅ Update + close
     session.closingCashCounted = closingCash;
     session.closingFloatActual = closingFloat;
     session.expectedCash = expectedCash;
@@ -293,14 +302,24 @@ export const closeSession = async (req, res) => {
 
     await session.save();
 
-    res.json({
+    return res.json({
+      message: "Session closed",
       session,
-      totals: {
+      reconciliation: {
+        openingCash,
+        openingFloat,
         totalCashDelta,
         totalFloatDelta,
+        expectedCash,
+        expectedFloat,
+        closingCash,
+        closingFloat,
+        cashVariance,
+        floatVariance,
+        txCount,
       },
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 };
