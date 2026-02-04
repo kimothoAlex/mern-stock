@@ -11,26 +11,31 @@ export default function POS() {
   const [searchTerm, setSearchTerm] = useState("");
   const [openReceipt, setOpenReceipt] = useState(false);
 
-  const [cart, setCart] = useState([]); // {productId, name, barcode, price, qty}
+  // ✅ cart supports both PRODUCT and VARIANT
+  // PRODUCT: { kind:"PRODUCT", productId, name, barcode, price, qty }
+  // VARIANT: { kind:"VARIANT", variantId, productId(base), name, barcode, price, qty }
+  const [cart, setCart] = useState([]);
   const [error, setError] = useState("");
 
   const [lookupLoading, setLookupLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
+
+  // ✅ searchResults supports both products + variants
+  const [searchResults, setSearchResults] = useState({ products: [], variants: [] });
 
   const [discount, setDiscount] = useState(0);
+
   // ✅ Register session
-const [register, setRegister] = useState(null);
-const [loadingRegister, setLoadingRegister] = useState(true);
-const [openRegisterModal, setOpenRegisterModal] = useState(false);
-const [openingFloat, setOpeningFloat] = useState("");
-const [registerError, setRegisterError] = useState("");
+  const [register, setRegister] = useState(null);
+  const [loadingRegister, setLoadingRegister] = useState(true);
+  const [openRegisterModal, setOpenRegisterModal] = useState(false);
+  const [openingFloat, setOpeningFloat] = useState("");
+  const [registerError, setRegisterError] = useState("");
 
   // Checkout modal
   const [openPay, setOpenPay] = useState(false);
   const [payMethod, setPayMethod] = useState("CASH"); // CASH | MPESA
   const [amountPaid, setAmountPaid] = useState("");
-  // const [mpesaCode, setMpesaCode] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const [lastSale, setLastSale] = useState(null);
@@ -39,27 +44,37 @@ const [registerError, setRegisterError] = useState("");
     barcodeRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-  const checkRegister = async () => {
+  const readJsonSafe = async (res) => {
+    const text = await res.text();
     try {
-      setLoadingRegister(true);
-      const res = await fetch("/api/register/open"); // GET open register
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data?.message || "Failed to check register");
-
-      setRegister(data); // can be null
-      if (!data) setOpenRegisterModal(true); // force open register first
-    } catch (e) {
-      setRegisterError(e.message);
-      setOpenRegisterModal(true);
-    } finally {
-      setLoadingRegister(false);
+      return text ? JSON.parse(text) : null;
+    } catch {
+      return null;
     }
   };
 
-  checkRegister();
-}, []);
+  useEffect(() => {
+    const checkRegister = async () => {
+      try {
+        setLoadingRegister(true);
+        const res = await fetch("/api/register/open");
+        const data = await readJsonSafe(res);
+
+        if (!res.ok) throw new Error(data?.message || "Failed to check register");
+
+        setRegister(data); // can be null
+        if (!data) setOpenRegisterModal(true);
+      } catch (e) {
+        setRegisterError(e.message);
+        setOpenRegisterModal(true);
+      } finally {
+        setLoadingRegister(false);
+      }
+    };
+
+    checkRegister();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const subtotal = useMemo(
     () => cart.reduce((sum, i) => sum + Number(i.price || 0) * Number(i.qty || 0), 0),
@@ -72,66 +87,76 @@ const [registerError, setRegisterError] = useState("");
     return Math.max(0, paid - total);
   }, [payMethod, amountPaid, total]);
 
-  const addToCart = (product, qtyToAdd = 1) => {
+  // ✅ addToCart merges by variantId (for VARIANT) or productId (for PRODUCT)
+  const addToCart = (item, qtyToAdd = 1) => {
     setCart((prev) => {
-      const idx = prev.findIndex((x) => x.productId === product._id);
+      const key = item.kind === "VARIANT" ? `v:${item.variantId}` : `p:${item.productId}`;
+
+      const idx = prev.findIndex((x) => {
+        const xKey = x.kind === "VARIANT" ? `v:${x.variantId}` : `p:${x.productId}`;
+        return xKey === key;
+      });
+
       if (idx >= 0) {
         const copy = [...prev];
-        copy[idx] = { ...copy[idx], qty: copy[idx].qty + qtyToAdd };
+        copy[idx] = { ...copy[idx], qty: Number(copy[idx].qty || 0) + Number(qtyToAdd || 1) };
         return copy;
       }
+
       return [
         ...prev,
         {
-          productId: product._id,
-          name: product.name,
-          barcode: product.barcode || "",
-          price: Number(product.price || 0),
-          qty: qtyToAdd,
+          ...item,
+          qty: Number(qtyToAdd || 1),
         },
       ];
     });
   };
-const handleOpenRegister = async () => {
-  try {
-    setRegisterError("");
-    const res = await fetch("/api/register/open", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ openingFloat: Number(openingFloat || 0) }),
-    });
 
-    const data = await readJsonSafe(res);
-    if (!res.ok) throw new Error(data?.message || "Failed to open register");
+  const handleOpenRegister = async () => {
+    try {
+      setRegisterError("");
+      const res = await fetch("/api/register/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ openingFloat: Number(openingFloat || 0) }),
+      });
 
-    setRegister(data);
-    setOpenRegisterModal(false);
-    enqueueSnackbar("Register opened", { variant: "success" });
-  } catch (e) {
-    setRegisterError(e.message);
-  }
-};
-const handleCloseRegister = async () => {
-  const closingCash = prompt("Enter closing cash count (KES):", "0");
-  if (closingCash === null) return;
+      const data = await readJsonSafe(res);
+      if (!res.ok) throw new Error(data?.message || "Failed to open register");
 
-  try {
-    const res = await fetch("/api/register/close", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ closingCash: Number(closingCash || 0) }),
-    });
+      setRegister(data);
+      setOpenRegisterModal(false);
+      enqueueSnackbar("Register opened", { variant: "success" });
+      barcodeRef.current?.focus();
+    } catch (e) {
+      setRegisterError(e.message);
+    }
+  };
 
-    const data = await readJsonSafe(res);
-    if (!res.ok) throw new Error(data?.message || "Failed to close register");
+  const handleCloseRegister = async () => {
+    const closingCash = prompt("Enter closing cash count (KES):", "0");
+    if (closingCash === null) return;
 
-    enqueueSnackbar("Register closed", { variant: "success" });
-    setRegister(null);
-    setOpenRegisterModal(true); // force open again before selling
-  } catch (e) {
-    setError(e.message);
-  }
-};
+    try {
+      const res = await fetch("/api/register/close", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ closingCash: Number(closingCash || 0) }),
+      });
+
+      const data = await readJsonSafe(res);
+      if (!res.ok) throw new Error(data?.message || "Failed to close register");
+
+      enqueueSnackbar("Register closed", { variant: "success" });
+      setRegister(null);
+      setOpenRegisterModal(true);
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  // ✅ Barcode lookup supports VARIANT + PRODUCT (from API matched.kind)
   const findByBarcodeAndAdd = async (overrideCode) => {
     const code = (overrideCode ?? barcodeInput).trim();
     setError("");
@@ -140,17 +165,58 @@ const handleCloseRegister = async () => {
     try {
       setLookupLoading(true);
       const res = await fetch(`/api/product/getproducts?barcode=${encodeURIComponent(code)}&limit=1`);
-      const data = await res.json();
+      const data = await readJsonSafe(res);
       if (!res.ok) throw new Error(data?.message || "Barcode lookup failed");
 
-      const product = data?.products?.[0];
-      if (!product) {
+      if (!data?.matched) {
         enqueueSnackbar("Barcode not found", { variant: "warning" });
         setError("Barcode not found.");
         return;
       }
 
-      addToCart(product, 1);
+      if (data.matched.kind === "VARIANT") {
+        const v = data.variants?.[0];
+        const base = v?.baseProduct || data.products?.[0];
+
+        if (!v || !base) throw new Error("Variant found but missing base product.");
+
+        addToCart(
+          {
+            kind: "VARIANT",
+            variantId: v._id,
+            productId: base._id, // base product id
+            name: v.name,
+            barcode: v.barcode || "",
+            price: Number(v.price || 0),
+          },
+          1
+        );
+
+        setBarcodeInput("");
+        enqueueSnackbar("Added variant to cart", { variant: "success" });
+        barcodeRef.current?.focus();
+        return;
+      }
+
+      // PRODUCT
+      const p = data?.products?.[0];
+      if (!p) {
+        enqueueSnackbar("Barcode not found", { variant: "warning" });
+        setError("Barcode not found.");
+        return;
+      }
+
+      addToCart(
+        {
+          kind: "PRODUCT",
+          productId: p._id,
+          name: p.name,
+          barcode: p.barcode || "",
+          price: Number(p.price || 0),
+        },
+        1
+      );
+
       setBarcodeInput("");
       enqueueSnackbar("Added to cart", { variant: "success" });
       barcodeRef.current?.focus();
@@ -161,20 +227,27 @@ const handleCloseRegister = async () => {
     }
   };
 
+  // ✅ Search returns both products + variants
   const searchByName = async () => {
     const q = searchTerm.trim();
     setError("");
-    setSearchResults([]);
+    setSearchResults({ products: [], variants: [] });
     if (!q) return setError("Type something to search.");
 
     try {
       setSearchLoading(true);
       const res = await fetch(`/api/product/getproducts?searchTerm=${encodeURIComponent(q)}&limit=20`);
-      const data = await res.json();
+      const data = await readJsonSafe(res);
       if (!res.ok) throw new Error(data?.message || "Search failed");
 
-      setSearchResults(data?.products || []);
-      if (!data?.products?.length) enqueueSnackbar("No products found", { variant: "info" });
+      setSearchResults({
+        products: data?.products || [],
+        variants: data?.variants || [],
+      });
+
+      if (!data?.products?.length && !data?.variants?.length) {
+        enqueueSnackbar("No products found", { variant: "info" });
+      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -182,99 +255,102 @@ const handleCloseRegister = async () => {
     }
   };
 
-  const updateQty = (productId, qty) => {
+  // ✅ updateQty/removeItem handle both kinds
+  const updateQty = (item, qty) => {
     setCart((prev) =>
       prev
-        .map((i) => (i.productId === productId ? { ...i, qty: Math.max(1, Number(qty || 1)) } : i))
+        .map((i) => {
+          const same =
+            i.kind === item.kind &&
+            (i.kind === "VARIANT" ? i.variantId === item.variantId : i.productId === item.productId);
+          return same ? { ...i, qty: Math.max(1, Number(qty || 1)) } : i;
+        })
         .filter((i) => i.qty > 0)
     );
   };
 
-  const removeItem = (productId) => {
-    setCart((prev) => prev.filter((i) => i.productId !== productId));
+  const removeItem = (item) => {
+    setCart((prev) =>
+      prev.filter((i) => {
+        const same =
+          i.kind === item.kind &&
+          (i.kind === "VARIANT" ? i.variantId === item.variantId : i.productId === item.productId);
+        return !same;
+      })
+    );
   };
 
   const clearSale = () => {
     setCart([]);
     setSearchTerm("");
-    setSearchResults([]);
+    setSearchResults({ products: [], variants: [] });
     setDiscount(0);
     setAmountPaid("");
-    // setMpesaCode("");
     setPayMethod("CASH");
     setLastSale(null);
     setError("");
     barcodeRef.current?.focus();
   };
 
- const readJsonSafe = async (res) => {
-  const text = await res.text();
-  try {
-    return text ? JSON.parse(text) : null;
-  } catch {
-    return null;
-  }
-};
-
-const checkout = async () => {
-  setError("");
-  if (!cart.length) return setError("Cart is empty.");
-  if (!register?._id) return setError("Open register to start selling.");
-
-  const paid = Number(amountPaid || 0);
-
-  if (payMethod === "CASH" && paid < total) return setError("Cash paid is less than total.");
-  if (payMethod === "MPESA" && paid < total) return setError("M-Pesa amount is less than total.");
-  // if (payMethod === "MPESA" && !mpesaCode.trim()) return setError("Enter M-Pesa code.");
-
-  try {
-    setCheckoutLoading(true);
-
-    const payload = {
-      registerId: register?._id,
-      items: cart.map((i) => ({ productId: i.productId, qty: i.qty })),
-      discount: Number(discount || 0),
-      payment: {
-        method: payMethod,
-        amountPaid: paid,
-        // mpesaCode: payMethod === "MPESA" ? mpesaCode.trim() : "",
-      },
-    };
-
-    const res = await fetch("/api/sale/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await readJsonSafe(res);
-
-    if (!res.ok) {
-      throw new Error(data?.message || "Checkout failed");
-    }
-
-    // ✅ store receipt FIRST
-    setLastSale(data?.sale);
-    setOpenPay(false);
-    setOpenReceipt(true);
-    enqueueSnackbar("Sale completed!", { variant: "success" });
-
-    // ✅ clear cart AFTER storing lastSale
-    setCart([]);
-    setSearchTerm("");
-    setSearchResults([]);
-    setDiscount(0);
-    setAmountPaid("");
-    // setMpesaCode("");
-    setPayMethod("CASH");
+  const checkout = async () => {
     setError("");
-    barcodeRef.current?.focus();
-  } catch (e) {
-    setError(e.message);
-  } finally {
-    setCheckoutLoading(false);
-  }
-};
+    if (!cart.length) return setError("Cart is empty.");
+    if (!register?._id) return setError("Open register to start selling.");
+
+    const paid = Number(amountPaid || 0);
+
+    if (payMethod === "CASH" && paid < total) return setError("Cash paid is less than total.");
+    if (payMethod === "MPESA" && paid < total) return setError("M-Pesa amount is less than total.");
+
+    try {
+      setCheckoutLoading(true);
+
+      const payload = {
+        registerId: register?._id,
+        items: cart.map((i) =>
+          i.kind === "VARIANT"
+            ? { variantId: i.variantId, qty: i.qty }
+            : { productId: i.productId, qty: i.qty }
+        ),
+        discount: Number(discount || 0),
+        payment: {
+          method: payMethod,
+          amountPaid: paid,
+        },
+      };
+
+      const res = await fetch("/api/sale/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await readJsonSafe(res);
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Checkout failed");
+      }
+
+      setLastSale(data?.sale);
+      setOpenPay(false);
+      setOpenReceipt(true);
+      enqueueSnackbar("Sale completed!", { variant: "success" });
+
+      // reset sale state
+      setCart([]);
+      setSearchTerm("");
+      setSearchResults({ products: [], variants: [] });
+      setDiscount(0);
+      setAmountPaid("");
+      setPayMethod("CASH");
+      setError("");
+      barcodeRef.current?.focus();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
 
   const printReceipt = () => {
     const receiptHtml = receiptRef.current?.innerHTML;
@@ -306,34 +382,32 @@ const checkout = async () => {
     w.print();
     w.close();
   };
-if (loadingRegister) {
-  return <Alert color="info">Loading POS...</Alert>;
-}
+
+  if (loadingRegister) {
+    return <Alert color="info">Loading POS...</Alert>;
+  }
+
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-4">
       <div className="flex items-center gap-2">
-  <Button color="light" onClick={clearSale}>New Sale</Button>
+        <Button color="light" onClick={clearSale}>
+          New Sale
+        </Button>
 
-  <Button
-    color="success"
-    onClick={() => setOpenRegisterModal(true)}
-    disabled={register}
-  >
-    Open Register
-  </Button>
-  <Button
-    color="failure"
-    onClick={handleCloseRegister}
-    disabled={!register}
-  >
-    Close Register
-  </Button>
-  {register ? (
-  <p className="text-xs text-green-600">Register OPEN</p>
-) : (
-  <p className="text-xs text-red-600">Register CLOSED</p>
-)}
-</div>
+        <Button color="success" onClick={() => setOpenRegisterModal(true)} disabled={!!register}>
+          Open Register
+        </Button>
+
+        <Button color="failure" onClick={handleCloseRegister} disabled={!register}>
+          Close Register
+        </Button>
+
+        {register ? (
+          <p className="text-xs text-green-600">Register OPEN</p>
+        ) : (
+          <p className="text-xs text-red-600">Register CLOSED</p>
+        )}
+      </div>
 
       {error && <Alert color="failure">{error}</Alert>}
 
@@ -370,7 +444,7 @@ if (loadingRegister) {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && searchByName()}
-                placeholder="e.g. sugar"
+                placeholder="e.g. sugar, milk 30l"
               />
               <Button onClick={searchByName} disabled={searchLoading}>
                 {searchLoading ? <Spinner size="sm" /> : "Search"}
@@ -378,15 +452,76 @@ if (loadingRegister) {
             </div>
 
             <div className="space-y-2 max-h-72 overflow-auto">
-              {searchResults.map((p) => (
-                <div key={p._id} className="border rounded p-3 bg-gray-50 dark:bg-gray-900 flex justify-between gap-2">
+              {/* VARIANTS FIRST */}
+              {(searchResults.variants || []).map((v) => {
+                const base = v.baseProduct;
+                const stock = base?.stockBaseQty ?? base?.quantity ?? 0;
+                return (
+                  <div
+                    key={v._id}
+                    className="border rounded p-3 bg-gray-50 dark:bg-gray-900 flex justify-between gap-2"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate">
+                        {v.name} <span className="text-xs text-blue-600">VARIANT</span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Base: {base?.name || "—"} • Stock: {stock} • KES{" "}
+                        {Number(v.price || 0).toLocaleString()}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        addToCart(
+                          {
+                            kind: "VARIANT",
+                            variantId: v._id,
+                            productId: base?._id,
+                            name: v.name,
+                            barcode: v.barcode || "",
+                            price: Number(v.price || 0),
+                          },
+                          1
+                        )
+                      }
+                    >
+                      Add
+                    </Button>
+                  </div>
+                );
+              })}
+
+              {/* PRODUCTS */}
+              {(searchResults.products || []).map((p) => (
+                <div
+                  key={p._id}
+                  className="border rounded p-3 bg-gray-50 dark:bg-gray-900 flex justify-between gap-2"
+                >
                   <div className="min-w-0">
                     <div className="font-semibold truncate">{p.name}</div>
                     <div className="text-xs text-gray-500">
-                      {p.category} • Stock: {p.quantity} • KES {Number(p.price || 0).toLocaleString()}
+                      {p.category} • Stock: {(p.stockBaseQty ?? p.quantity ?? 0)} • KES{" "}
+                      {Number(p.price || 0).toLocaleString()}
                     </div>
                   </div>
-                  <Button size="sm" onClick={() => addToCart(p, 1)}>Add</Button>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      addToCart(
+                        {
+                          kind: "PRODUCT",
+                          productId: p._id,
+                          name: p.name,
+                          barcode: p.barcode || "",
+                          price: Number(p.price || 0),
+                        },
+                        1
+                      )
+                    }
+                  >
+                    Add
+                  </Button>
                 </div>
               ))}
             </div>
@@ -411,30 +546,45 @@ if (loadingRegister) {
 
               <Table.Body className="divide-y">
                 {cart.map((i) => (
-                  <Table.Row key={i.productId}>
+                  <Table.Row key={i.kind === "VARIANT" ? i.variantId : i.productId}>
                     <Table.Cell>
-                      <div className="font-semibold">{i.name}</div>
+                      <div className="font-semibold">
+                        {i.name}{" "}
+                        {i.kind === "VARIANT" ? (
+                          <span className="text-xs text-blue-600">VARIANT</span>
+                        ) : null}
+                      </div>
                       <div className="text-xs text-gray-500">Barcode: {i.barcode || "—"}</div>
                     </Table.Cell>
+
                     <Table.Cell className="text-right">KES {Number(i.price).toLocaleString()}</Table.Cell>
+
                     <Table.Cell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button size="xs" color="light" onClick={() => updateQty(i.productId, i.qty - 1)}>-</Button>
+                        <Button size="xs" color="light" onClick={() => updateQty(i, i.qty - 1)}>
+                          -
+                        </Button>
                         <input
                           className="w-16 text-right border rounded px-2 py-1 bg-transparent"
                           type="number"
                           min={1}
                           value={i.qty}
-                          onChange={(e) => updateQty(i.productId, e.target.value)}
+                          onChange={(e) => updateQty(i, e.target.value)}
                         />
-                        <Button size="xs" color="light" onClick={() => updateQty(i.productId, i.qty + 1)}>+</Button>
+                        <Button size="xs" color="light" onClick={() => updateQty(i, i.qty + 1)}>
+                          +
+                        </Button>
                       </div>
                     </Table.Cell>
+
                     <Table.Cell className="text-right">
                       KES {(Number(i.price) * Number(i.qty)).toLocaleString()}
                     </Table.Cell>
+
                     <Table.Cell className="text-right">
-                      <Button size="xs" color="failure" onClick={() => removeItem(i.productId)}>Remove</Button>
+                      <Button size="xs" color="failure" onClick={() => removeItem(i)}>
+                        Remove
+                      </Button>
                     </Table.Cell>
                   </Table.Row>
                 ))}
@@ -447,13 +597,22 @@ if (loadingRegister) {
             <div className="flex items-end gap-3">
               <div>
                 <Label value="Discount (KES)" />
-                <TextInput type="number" min={0} value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                <TextInput
+                  type="number"
+                  min={0}
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                />
               </div>
             </div>
 
             <div className="space-y-1 text-right">
-              <div className="text-sm">Subtotal: <b>KES {subtotal.toLocaleString()}</b></div>
-              <div className="text-sm">Discount: <b>KES {Number(discount || 0).toLocaleString()}</b></div>
+              <div className="text-sm">
+                Subtotal: <b>KES {subtotal.toLocaleString()}</b>
+              </div>
+              <div className="text-sm">
+                Discount: <b>KES {Number(discount || 0).toLocaleString()}</b>
+              </div>
               <div className="text-lg font-bold">Total: KES {total.toLocaleString()}</div>
               <Button onClick={() => setOpenPay(true)} disabled={!cart.length || !register}>
                 Checkout
@@ -483,13 +642,6 @@ if (loadingRegister) {
               Total: <b>KES {total.toLocaleString()}</b>
             </div>
 
-            {/* {payMethod === "MPESA" && (
-              <div>
-                <Label value="M-Pesa Code" />
-                <TextInput value={mpesaCode} onChange={(e) => setMpesaCode(e.target.value)} placeholder="e.g. QWE123ABC" />
-              </div>
-            )} */}
-
             <div>
               <Label value={payMethod === "CASH" ? "Cash Paid (KES)" : "M-Pesa Amount (KES)"} />
               <TextInput type="number" min={0} value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} />
@@ -502,10 +654,14 @@ if (loadingRegister) {
             )}
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button color="light" onClick={() => setOpenPay(false)}>Cancel</Button>
+              <Button color="light" onClick={() => setOpenPay(false)}>
+                Cancel
+              </Button>
               <Button onClick={checkout} disabled={checkoutLoading}>
                 {checkoutLoading ? (
-                  <span className="flex items-center gap-2"><Spinner size="sm" /> Processing</span>
+                  <span className="flex items-center gap-2">
+                    <Spinner size="sm" /> Processing
+                  </span>
                 ) : (
                   "Complete Sale & Print"
                 )}
@@ -514,85 +670,35 @@ if (loadingRegister) {
           </div>
         </Modal.Body>
       </Modal>
-      <ThermalReceiptModal
-  show={openReceipt}
-  onClose={() => setOpenReceipt(false)}
-  receipt={lastSale}
-/>
-<Modal show={openRegisterModal} onClose={() => setOpenRegisterModal(false)} popup size="md">
-  <Modal.Header />
-  <Modal.Body>
-    <div className="space-y-4">
-      <h3 className="text-xl font-semibold">Open Register</h3>
 
-      <div>
-        <Label value="Opening cash float (KES) (optional)" />
-        <TextInput
-          type="number"
-          min={0}
-          value={openingFloat}
-          onChange={(e) => setOpeningFloat(e.target.value)}
-          placeholder="e.g. 1000"
-        />
-      </div>
+      <ThermalReceiptModal show={openReceipt} onClose={() => setOpenReceipt(false)} receipt={lastSale} />
 
-      {registerError && <Alert color="failure">{registerError}</Alert>}
+      {/* OPEN REGISTER MODAL */}
+      <Modal show={openRegisterModal} onClose={() => setOpenRegisterModal(false)} popup size="md">
+        <Modal.Header />
+        <Modal.Body>
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold">Open Register</h3>
 
-      <Button onClick={handleOpenRegister} className="w-full">
-        Open Register
-      </Button>
-    </div>
-  </Modal.Body>
-</Modal>
-      {/* HIDDEN RECEIPT TEMPLATE */}
-      {/* <div className="hidden">
-        <div ref={receiptRef}>
-          <div className="center bold">YOUR MINI MARKET</div>
-          <div className="center">Tel: 07xx xxx xxx</div>
-          <div className="center">Receipt</div>
-          <div className="line"></div>
+            <div>
+              <Label value="Opening cash float (KES) (optional)" />
+              <TextInput
+                type="number"
+                min={0}
+                value={openingFloat}
+                onChange={(e) => setOpeningFloat(e.target.value)}
+                placeholder="e.g. 1000"
+              />
+            </div>
 
-          <div style={{ fontSize: 12 }}>
-            Date: {new Date().toLocaleString()}
+            {registerError && <Alert color="failure">{registerError}</Alert>}
+
+            <Button onClick={handleOpenRegister} className="w-full">
+              Open Register
+            </Button>
           </div>
-
-          <div className="line"></div>
-          <table>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", fontSize: 12 }}>Item</th>
-                <th className="right" style={{ fontSize: 12 }}>Qty</th>
-                <th className="right" style={{ fontSize: 12 }}>Amt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cart.map((i) => (
-                <tr key={i.productId}>
-                  <td style={{ fontSize: 12 }}>{i.name}</td>
-                  <td className="right" style={{ fontSize: 12 }}>{i.qty}</td>
-                  <td className="right" style={{ fontSize: 12 }}>
-                    {(Number(i.price) * Number(i.qty)).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="line"></div>
-          <div className="right" style={{ fontSize: 12 }}>Subtotal: {subtotal.toLocaleString()}</div>
-          <div className="right" style={{ fontSize: 12 }}>Discount: {Number(discount || 0).toLocaleString()}</div>
-          <div className="right bold">TOTAL: {total.toLocaleString()}</div>
-
-          <div className="line"></div>
-          <div style={{ fontSize: 12 }}>Payment: {payMethod}</div>
-          {payMethod === "MPESA" && <div style={{ fontSize: 12 }}>M-Pesa Code: {mpesaCode}</div>}
-          <div style={{ fontSize: 12 }}>Paid: {Number(amountPaid || 0).toLocaleString()}</div>
-          {payMethod === "CASH" && <div style={{ fontSize: 12 }}>Change: {change.toLocaleString()}</div>}
-
-          <div className="line"></div>
-          <div className="center" style={{ fontSize: 12 }}>THANK YOU!</div>
-        </div>
-      </div> */}
+        </Modal.Body>
+      </Modal>
     </div>
   );
 }
