@@ -4,9 +4,6 @@ import ProductVariant from "../models/productVariant.model.js";
 import { errorHandler } from "../utils/error.js";
 
 // controllers/product.controller.js
-import Product from "../models/product.model.js";
-import ProductVariant from "../models/productVariant.model.js"; // ✅ add this model
-import { errorHandler } from "../utils/error.js";
 
 export const create = async (req, res, next) => {
   try {
