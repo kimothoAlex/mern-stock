@@ -25,7 +25,8 @@ export default function MpesaTransactions() {
 const [showClose, setShowClose] = useState(false);
 const [closingCashCounted, setClosingCashCounted] = useState("");
 const [closingFloatActual, setClosingFloatActual] = useState("");
-
+const [openingFloat, setOpeningFloat] = useState("");
+const [openingNotes, setOpeningNotes] = useState("");
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -38,10 +39,21 @@ const [closingFloatActual, setClosingFloatActual] = useState("");
     return params.toString();
   }, [ page, type, q, from, to]);
   const fetchSession = async () => {
-  const res = await fetch(`/api/mpesa/session/current`);
-  const data = await res.json();
-  setSession(data);
+  try {
+    const res = await fetch("/api/mpesa/session/current");
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data?.message || "Failed to load session");
+
+    setSession(data);
+
+    // ✅ If no open session, prompt user to open one
+    if (!data) setShowOpen(true);
+  } catch (e) {
+    enqueueSnackbar(e.message, { variant: "error" });
+  }
 };
+
 
 useEffect(() => {
   fetchSession();
@@ -108,6 +120,33 @@ const closeSession = async () => {
     enqueueSnackbar(e.message, { variant: "error" });
   }
 };
+const openSession = async () => {
+  try {
+    const res = await fetch("/api/mpesa/session/open", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        openingCashInHand: Number(openingCashInHand),
+        openingFloat: Number(openingFloat),
+        notes: openingNotes,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || "Failed to open session");
+
+    setSession(data);
+    setShowOpen(false);
+
+    enqueueSnackbar("Session opened", { variant: "success" });
+
+    // refresh txns (will be empty initially)
+    fetchTxns();
+  } catch (e) {
+    enqueueSnackbar(e.message, { variant: "error" });
+  }
+};
+
 
 
   return (
@@ -146,6 +185,10 @@ const closeSession = async () => {
             <Button color="success" onClick={exportSession}>
             Export This Session
             </Button>
+            <Button color="success" onClick={() => setShowOpen(true)} disabled={!!session}>
+  Open Session
+</Button>
+
             <Button
     color="failure"
     onClick={() => setShowClose(true)}
@@ -196,6 +239,54 @@ const closeSession = async () => {
         <div className="text-sm text-gray-600">Page {page} of {pages}</div>
         <Button color="gray" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Next</Button>
       </div>
+      <Modal show={showOpen} onClose={() => {}}>
+  <Modal.Header>Open M-Pesa Session</Modal.Header>
+
+  <Modal.Body>
+    <div className="space-y-3">
+      <div>
+        <Label value="Opening Cash in Hand" />
+        <TextInput
+          type="number"
+          value={openingCashInHand}
+          onChange={(e) => setOpeningCashInHand(e.target.value)}
+          placeholder="e.g. 5000"
+          required
+        />
+      </div>
+
+      <div>
+        <Label value="Opening Float" />
+        <TextInput
+          type="number"
+          value={openingFloat}
+          onChange={(e) => setOpeningFloat(e.target.value)}
+          placeholder="e.g. 50000"
+          required
+        />
+      </div>
+
+      <div>
+        <Label value="Notes (optional)" />
+        <Textarea
+          rows={2}
+          value={openingNotes}
+          onChange={(e) => setOpeningNotes(e.target.value)}
+          placeholder="Any note about today's opening..."
+        />
+      </div>
+
+      <div className="text-sm text-gray-600">
+        You must open a session to start recording M-Pesa transactions.
+      </div>
+    </div>
+  </Modal.Body>
+
+  <Modal.Footer>
+    <Button onClick={openSession}>Open Session</Button>
+  </Modal.Footer>
+</Modal>
+
       <Modal show={showClose} onClose={() => setShowClose(false)}>
   <Modal.Header>Close M-Pesa Session</Modal.Header>
 
