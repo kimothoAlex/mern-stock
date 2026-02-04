@@ -12,7 +12,7 @@ const TYPES = [
   "REVERSAL",
 ];
 
-export default function MpesaTransactions({ shopId }) {
+export default function MpesaTransactions() {
   const [items, setItems] = useState([]);
   const [pages, setPages] = useState(1);
   const [page, setPage] = useState(1);
@@ -29,7 +29,6 @@ const [closingFloatActual, setClosingFloatActual] = useState("");
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
-    params.set("shopId", shopId);
     params.set("page", String(page));
     params.set("limit", "25");
     if (type) params.set("type", type);
@@ -37,9 +36,9 @@ const [closingFloatActual, setClosingFloatActual] = useState("");
     if (from) params.set("from", from);
     if (to) params.set("to", to);
     return params.toString();
-  }, [shopId, page, type, q, from, to]);
+  }, [ page, type, q, from, to]);
   const fetchSession = async () => {
-  const res = await fetch(`/api/mpesa/session/current?shopId=${shopId}`);
+  const res = await fetch(`/api/mpesa/session/current`);
   const data = await res.json();
   setSession(data);
 };
@@ -68,7 +67,6 @@ useEffect(() => {
 
   const exportCsv = () => {
     const params = new URLSearchParams();
-    params.set("shopId", shopId);
     if (type) params.set("type", type);
     if (q) params.set("q", q);
     if (from) params.set("from", from);
@@ -91,7 +89,6 @@ const closeSession = async () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        shopId,
         closingCashCounted: Number(closingCashCounted),
         closingFloatActual: Number(closingFloatActual),
       }),
