@@ -244,9 +244,7 @@ export const exportSessionCsv = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-// controllers/mpesa.controller.js
-import MpesaSession from "../models/MpesaSession.js";
-import MpesaTxn from "../models/MpesaTxn.js";
+
 
 export const closeSession = async (req, res) => {
   try {
