@@ -148,6 +148,13 @@ const Header = () => {
           : ""}
         {currentUser
           ? currentUser.isAdmin && (
+              <Navbar.Link active={path === "/mpesa-transactions"} as={"div"}>
+                <Link to="/mpesa-transactions">M-Pesa Transactions</Link>
+              </Navbar.Link>
+            )
+          : ""}
+        {currentUser
+          ? currentUser.isAdmin && (
               <Navbar.Link
                 active={path === "/dashboard?tab=products"}
                 as={"div"}
