@@ -28,6 +28,13 @@ const [closingCashCounted, setClosingCashCounted] = useState("");
 const [closingFloatActual, setClosingFloatActual] = useState("");
 const [openingCashInHand, setOpeningCashInHand] = useState("");
 const [openingFloat, setOpeningFloat] = useState("");
+const [showTxn, setShowTxn] = useState(false);
+const [txnType, setTxnType] = useState("AGENT_DEPOSIT");
+const [txnAmount, setTxnAmount] = useState("");
+const [txnMpesaCode, setTxnMpesaCode] = useState("");
+const [txnPhone, setTxnPhone] = useState("");
+const [txnNote, setTxnNote] = useState("");
+
 const [openingNotes, setOpeningNotes] = useState("");
 
   const queryString = useMemo(() => {
@@ -56,6 +63,53 @@ const [openingNotes, setOpeningNotes] = useState("");
   }
 };
 
+const createTxn = async () => {
+  try {
+    if (!session?._id) {
+      enqueueSnackbar("Open a session first", { variant: "warning" });
+      return;
+    }
+
+    const amount = Number(txnAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      enqueueSnackbar("Enter a valid amount", { variant: "warning" });
+      return;
+    }
+
+    const payload = {
+      type: txnType,
+      amount,
+      mpesaCode: txnMpesaCode || undefined,
+      phone: txnPhone || undefined,
+      note: txnNote || undefined,
+    };
+
+    const res = await fetch("/api/mpesa/txns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || "Failed to create transaction");
+
+    enqueueSnackbar("Transaction saved", { variant: "success" });
+
+    // reset form
+    setTxnAmount("");
+    setTxnMpesaCode("");
+    setTxnPhone("");
+    setTxnNote("");
+    setTxnType("AGENT_DEPOSIT");
+
+    setShowTxn(false);
+
+    // refresh list + session banner if you have one
+    fetchTxns();
+  } catch (e) {
+    enqueueSnackbar(e.message, { variant: "error" });
+  }
+};
 
 useEffect(() => {
   fetchSession();
@@ -190,6 +244,10 @@ const openSession = async () => {
             <Button color="success" onClick={() => setShowOpen(true)} disabled={!!session}>
   Open Session
 </Button>
+<Button onClick={() => setShowTxn(true)} disabled={!session?._id}>
+  New Transaction
+</Button>
+
 
             <Button
     color="failure"
@@ -322,6 +380,79 @@ const openSession = async () => {
     <Button color="gray" onClick={() => setShowClose(false)}>
       Cancel
     </Button>
+  </Modal.Footer>
+</Modal>
+<Modal show={showTxn} onClose={() => setShowTxn(false)}>
+  <Modal.Header>New M-Pesa Transaction</Modal.Header>
+
+  <Modal.Body>
+    <div className="space-y-3">
+      <div>
+        <Label value="Type" />
+        <Select value={txnType} onChange={(e) => setTxnType(e.target.value)}>
+          <option value="AGENT_DEPOSIT">Deposit (Customer gives cash, you send M-Pesa)</option>
+          <option value="AGENT_WITHDRAWAL">Withdrawal (Customer sends M-Pesa, you give cash)</option>
+          <option value="FLOAT_TOPUP_CASH">Float Top-up (Using Cash)</option>
+          <option value="FLOAT_TOPUP_EXTERNAL">Float Top-up (External/Bank)</option>
+          <option value="FLOAT_CASHOUT">Float Cash-out (Convert Float to Cash)</option>
+        </Select>
+      </div>
+
+      <div>
+        <Label value="Amount" />
+        <TextInput
+          type="number"
+          value={txnAmount}
+          onChange={(e) => setTxnAmount(e.target.value)}
+          placeholder="e.g. 2000"
+          required
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div>
+          <Label value="M-Pesa Code (optional)" />
+          <TextInput
+            value={txnMpesaCode}
+            onChange={(e) => setTxnMpesaCode(e.target.value)}
+            placeholder="e.g. QAX123ABC"
+          />
+        </div>
+
+        <div>
+          <Label value="Phone (optional)" />
+          <TextInput
+            value={txnPhone}
+            onChange={(e) => setTxnPhone(e.target.value)}
+            placeholder="e.g. 07xxxxxxxx"
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label value="Note (optional)" />
+        <Textarea
+          rows={2}
+          value={txnNote}
+          onChange={(e) => setTxnNote(e.target.value)}
+          placeholder="Any details..."
+        />
+      </div>
+
+      {/* Helpful reminder of accounting effect */}
+      <div className="text-sm text-gray-600">
+        {txnType === "AGENT_DEPOSIT" && "Effect: Cash ↑, Float ↓"}
+        {txnType === "AGENT_WITHDRAWAL" && "Effect: Cash ↓, Float ↑"}
+        {txnType === "FLOAT_TOPUP_CASH" && "Effect: Cash ↓, Float ↑"}
+        {txnType === "FLOAT_TOPUP_EXTERNAL" && "Effect: Cash →, Float ↑"}
+        {txnType === "FLOAT_CASHOUT" && "Effect: Cash ↑, Float ↓"}
+      </div>
+    </div>
+  </Modal.Body>
+
+  <Modal.Footer>
+    <Button onClick={createTxn}>Save</Button>
+    <Button color="gray" onClick={() => setShowTxn(false)}>Cancel</Button>
   </Modal.Footer>
 </Modal>
 
