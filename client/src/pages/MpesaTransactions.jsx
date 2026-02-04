@@ -26,6 +26,7 @@ const [showClose, setShowClose] = useState(false);
 const [showOpen, setShowOpen] = useState(false);
 const [closingCashCounted, setClosingCashCounted] = useState("");
 const [closingFloatActual, setClosingFloatActual] = useState("");
+const [openingCashInHand, setOpeningCashInHand] = useState("");
 const [openingFloat, setOpeningFloat] = useState("");
 const [openingNotes, setOpeningNotes] = useState("");
 
