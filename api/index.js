@@ -6,6 +6,7 @@ import userRoutes from './routes/user.route.js';
 import productRoutes from "./routes/product.route.js"
 import registerRoutes from "./routes/register.route.js";;
 import salesRoutes from "./routes/sales.route.js"
+import mpesaRoutes from "./routes/mpesa.route.js"
 import cookieParser from "cookie-parser";
 // import sseServer from "./controllers/sseServer.js"
 import cors from "cors"
@@ -38,6 +39,7 @@ app.use('/api/user', userRoutes);
 app.use("/api/product",productRoutes);
 app.use("/api/sale",salesRoutes);
 app.use("/api/register", registerRoutes);
+app.use("/api/mpesa", mpesaRoutes)
 // sseServer(app);
 
 app.use(express.static(path.join(_dirname, "/client/dist")));
