@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Select, Label, TextInput, Spinner, Table, Modal  } from "flowbite-react";
+import { Button, Select, Label, TextInput, Spinner, Table, Modal, Textarea  } from "flowbite-react";
 import { enqueueSnackbar } from "notistack";
 
 const TYPES = [
