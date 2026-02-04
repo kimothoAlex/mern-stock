@@ -34,7 +34,7 @@ const [txnAmount, setTxnAmount] = useState("");
 const [txnMpesaCode, setTxnMpesaCode] = useState("");
 const [txnPhone, setTxnPhone] = useState("");
 const [txnNote, setTxnNote] = useState("");
-
+const [lastReconciliation, setLastReconciliation] = useState(null)
 const [openingNotes, setOpeningNotes] = useState("");
 
   const queryString = useMemo(() => {
@@ -151,6 +151,7 @@ const exportSession = () => {
 
   window.location.href = `/api/mpesa/session/${session._id}/export.csv`;
 };
+
 const closeSession = async () => {
   try {
     const res = await fetch("/api/mpesa/session/close", {
@@ -163,15 +164,22 @@ const closeSession = async () => {
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message);
+    if (!res.ok) throw new Error(data?.message || "Failed to close session");
+
+    // ✅ Store reconciliation so you can display it
+    setLastReconciliation(data.reconciliation);
 
     setShowClose(false);
 
-    // auto download report
+    // ✅ This is what makes it "close automatically" on screen:
+    // current session should become null after this
+    await fetchSession();
+    await fetchTxns();
+
+    // ✅ Auto export the just-closed session
     window.location.href = `/api/mpesa/session/${data.session._id}/export.csv`;
 
-    fetchSession();
-    fetchTxns();
+    enqueueSnackbar("Session closed and exported", { variant: "success" });
   } catch (e) {
     enqueueSnackbar(e.message, { variant: "error" });
   }
@@ -259,6 +267,17 @@ const openSession = async () => {
         </div>
 
       </div>
+{lastReconciliation && (
+  <div className="p-3 border rounded bg-gray-50 text-sm space-y-1">
+    <div className="font-semibold">Last Session Reconciliation</div>
+    <div>Opening Cash: <b>{lastReconciliation.openingCash}</b> | Opening Float: <b>{lastReconciliation.openingFloat}</b></div>
+    <div>Total Cash Δ: <b>{lastReconciliation.totalCashDelta}</b> | Total Float Δ: <b>{lastReconciliation.totalFloatDelta}</b></div>
+    <div>Expected Cash: <b>{lastReconciliation.expectedCash}</b> | Expected Float: <b>{lastReconciliation.expectedFloat}</b></div>
+    <div>Closing Cash: <b>{lastReconciliation.closingCash}</b> | Closing Float: <b>{lastReconciliation.closingFloat}</b></div>
+    <div>Cash Variance: <b>{lastReconciliation.cashVariance}</b> | Float Variance: <b>{lastReconciliation.floatVariance}</b></div>
+    <div>Transactions: <b>{lastReconciliation.txCount}</b></div>
+  </div>
+)}
 
       <div className="overflow-x-auto border rounded">
         <table className="w-full text-sm">
@@ -299,7 +318,7 @@ const openSession = async () => {
         <div className="text-sm text-gray-600">Page {page} of {pages}</div>
         <Button color="gray" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Next</Button>
       </div>
-      <Modal show={showOpen} onClose={() => {}}>
+      <Modal show={showOpen} onClose={() => {setShowOpen(false);}}>
   <Modal.Header>Open M-Pesa Session</Modal.Header>
 
   <Modal.Body>
