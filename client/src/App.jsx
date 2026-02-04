@@ -12,7 +12,7 @@ import UpdateProduct from "./pages/UpdateProduct";
 import DailyRegisterReport from "./pages/DailyReports";
 import IsAdminPrivateRoute from "./components/IsAdminPrivateRoute";
 import Search from "./pages/Search";
-
+import MpesaTransactions from "./pages/MpesaTransactions";
 import BarcodeProducts from "./pages/BarcodeProducts";
 
 const App = () => {
@@ -24,6 +24,7 @@ const App = () => {
         <Route path="/sign-in" element={<Signin />} />
         <Route path="/sign-up" element={<Signup />} />
         <Route path="/barcode" element={<BarcodeProducts />} />
+        <Route path="/mpesa-transactions" element={<MpesaTransactions />} />
         
         <Route element={<PrivateRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
