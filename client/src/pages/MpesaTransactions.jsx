@@ -23,6 +23,7 @@ export default function MpesaTransactions() {
   const [to, setTo] = useState("");
   const [session, setSession] = useState(null);
 const [showClose, setShowClose] = useState(false);
+const [showOpen, setShowOpen] = useState(false);
 const [closingCashCounted, setClosingCashCounted] = useState("");
 const [closingFloatActual, setClosingFloatActual] = useState("");
 const [openingFloat, setOpeningFloat] = useState("");
