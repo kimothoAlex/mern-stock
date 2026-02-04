@@ -1,6 +1,7 @@
 import Product from "../models/product.model.js";
 import Sale from "../models/sale.model.js";
 import Register from "../models/register.model.js";
+import ProductVariant from "../models/productVariant.model.js";
 import { errorHandler } from "../utils/error.js";
 
 export const createSale = async (req, res, next) => {
@@ -41,13 +42,12 @@ export const createSale = async (req, res, next) => {
     next(err); // Handle validation errors or other bad requests
   }
 };
+
 export const checkoutSale = async (req, res, next) => {
   try {
     const { registerId, items, discount = 0, payment } = req.body;
 
-    if (!registerId) {
-      return next(errorHandler(400, "Register is required."));
-    }
+    if (!registerId) return next(errorHandler(400, "Register is required."));
 
     const register = await Register.findOne({
       _id: registerId,
@@ -55,9 +55,7 @@ export const checkoutSale = async (req, res, next) => {
       status: "OPEN",
     });
 
-    if (!register) {
-      return next(errorHandler(403, "No open register found."));
-    }
+    if (!register) return next(errorHandler(403, "No open register found."));
 
     if (!Array.isArray(items) || items.length === 0) {
       return next(errorHandler(400, "Cart is empty."));
@@ -68,63 +66,169 @@ export const checkoutSale = async (req, res, next) => {
     }
 
     const amountPaid = Number(payment.amountPaid || 0);
-    if (amountPaid <= 0) {
+    if (!Number.isFinite(amountPaid) || amountPaid <= 0) {
       return next(errorHandler(400, "amountPaid is required."));
     }
 
-    // if (payment.method === "MPESA" && !payment.mpesaCode?.trim()) {
-    //   return next(errorHandler(400, "M-Pesa code required."));
-    // }
+    // --- NEW: support lines that may contain variantId ---
+    // Each line can be either:
+    // { productId, qty }  (normal product)
+    // OR
+    // { variantId, qty }  (variant SKU)
+    // You can also allow both, but variantId takes priority.
 
-    // Load products
-    const ids = items.map((i) => i.productId);
-    const products = await Product.find({ _id: { $in: ids } });
-    const map = new Map(products.map((p) => [String(p._id), p]));
+    const variantIds = items.filter((i) => i.variantId).map((i) => i.variantId);
+    const productIds = items
+      .filter((i) => i.productId)
+      .map((i) => i.productId);
+
+    const variants = variantIds.length
+      ? await ProductVariant.find({ _id: { $in: variantIds }, isActive: true }).lean()
+      : [];
+    const variantMap = new Map(variants.map((v) => [String(v._id), v]));
+
+    // For variants we need their base products
+    const baseProductIdsFromVariants = variants.map((v) => v.productId);
+
+    const allProductIds = [
+      ...new Set([
+        ...productIds.map(String),
+        ...baseProductIdsFromVariants.map((x) => String(x)),
+      ]),
+    ];
+
+    const products = allProductIds.length
+      ? await Product.find({ _id: { $in: allProductIds } }).lean()
+      : [];
+    const productMap = new Map(products.map((p) => [String(p._id), p]));
 
     let subtotal = 0;
     const receiptItems = [];
 
-    for (const line of items) {
-      const qty = Number(line.qty);
-      const p = map.get(String(line.productId));
+    // Track how much base stock to deduct per product (in base units)
+    // key: productId, value: baseQtyToDeduct
+    const deductBase = new Map();
 
-      if (!p) return next(errorHandler(404, "Product not found"));
-      if (p.quantity < qty) {
-        return next(errorHandler(400, `Not enough stock for ${p.name}`));
+    // Helper: get stock in base units for ANY product
+    const getStockBase = (p) => {
+      // prefer stockBaseQty if exists, else fallback to quantity
+      const s = p.stockBaseQty ?? p.quantity ?? 0;
+      return Number(s || 0);
+    };
+
+    // Helper: validate numeric qty
+    const parseQty = (q) => {
+      const n = Number(q);
+      if (!Number.isFinite(n) || n <= 0) return null;
+      return n;
+    };
+
+    for (const line of items) {
+      const qty = parseQty(line.qty);
+      if (!qty) return next(errorHandler(400, "Invalid qty in cart."));
+
+      // CASE A: Variant sale
+      if (line.variantId) {
+        const v = variantMap.get(String(line.variantId));
+        if (!v) return next(errorHandler(404, "Variant not found"));
+
+        const baseProduct = productMap.get(String(v.productId));
+        if (!baseProduct) return next(errorHandler(404, "Base product not found"));
+
+        const unitSizeInBase = Number(v.unitSizeInBase || 0);
+        if (!Number.isFinite(unitSizeInBase) || unitSizeInBase <= 0) {
+          return next(errorHandler(400, "Variant unit size invalid"));
+        }
+
+        const baseQtyNeeded = unitSizeInBase * qty;
+
+        // record deduction (base product)
+        const k = String(baseProduct._id);
+        deductBase.set(k, (deductBase.get(k) || 0) + baseQtyNeeded);
+
+        // price is variant price
+        const pricePerUnit = Number(v.price || 0);
+        const lineTotal = pricePerUnit * qty;
+        subtotal += lineTotal;
+
+        receiptItems.push({
+          productId: baseProduct._id, // base product id
+          variantId: v._id,           // NEW (recommended)
+          productName: v.name,        // show variant name on receipt
+          barcode: v.barcode || "",
+          pricePerUnit,
+          quantity: qty,
+          totalPrice: lineTotal,
+          baseQtyDeducted: baseQtyNeeded, // NEW (recommended)
+        });
+
+        continue;
       }
 
-      const lineTotal = p.price * qty;
+      // CASE B: Normal product sale (single SKU)
+      const p = productMap.get(String(line.productId));
+      if (!p) return next(errorHandler(404, "Product not found"));
+
+      // For normal products, assume 1 qty = 1 base unit
+      // (If baseUnit is pcs, this is correct. If you later want e.g. “1kg bulk entry” you’ll handle as variant/bulk)
+      const baseQtyNeeded = qty;
+
+      const k = String(p._id);
+      deductBase.set(k, (deductBase.get(k) || 0) + baseQtyNeeded);
+
+      const pricePerUnit = Number(p.price || 0);
+      const lineTotal = pricePerUnit * qty;
       subtotal += lineTotal;
 
       receiptItems.push({
         productId: p._id,
         productName: p.name,
         barcode: p.barcode || "",
-        pricePerUnit: p.price,
+        pricePerUnit,
         quantity: qty,
         totalPrice: lineTotal,
+        baseQtyDeducted: baseQtyNeeded, // optional
       });
+    }
+
+    // --- STOCK CHECK (important): validate totals before updating ---
+    for (const [productId, baseQtyNeeded] of deductBase.entries()) {
+      const p = productMap.get(String(productId));
+      if (!p) return next(errorHandler(404, "Product not found"));
+
+      const available = getStockBase(p);
+      if (available < baseQtyNeeded) {
+        // show clean name
+        return next(errorHandler(400, `Not enough stock for ${p.name}`));
+      }
     }
 
     const disc = Math.max(0, Number(discount));
     const total = subtotal - disc;
 
-    if (amountPaid < total) {
-      return next(errorHandler(400, "Amount paid is less than total."));
+    if (total < 0) return next(errorHandler(400, "Total cannot be negative."));
+    if (amountPaid < total) return next(errorHandler(400, "Amount paid is less than total."));
+
+    const change = payment.method === "CASH" ? amountPaid - total : 0;
+
+    // --- DEDUCT STOCK (atomic per product) ---
+    // Use stockBaseQty if you migrated, else fallback to quantity
+    // Best: always use stockBaseQty going forward.
+    const bulkOps = [];
+    for (const [productId, baseQtyNeeded] of deductBase.entries()) {
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: productId },
+          update: { $inc: { stockBaseQty: -baseQtyNeeded } },
+        },
+      });
     }
 
-    const change =
-      payment.method === "CASH" ? amountPaid - total : 0;
-
-    // Deduct stock
-    for (const line of items) {
-      await Product.updateOne(
-        { _id: line.productId },
-        { $inc: { quantity: -Number(line.qty) } }
-      );
+    if (bulkOps.length) {
+      await Product.bulkWrite(bulkOps);
     }
 
-    // ✅ Save sale (receiptNo auto generated)
+    // ✅ Save sale
     const sale = await Sale.create({
       registerId: register._id,
       cashierId: req.user.id,
@@ -136,7 +240,6 @@ export const checkoutSale = async (req, res, next) => {
         method: payment.method,
         amountPaid,
         change,
-        // mpesaCode: payment.method === "MPESA" ? payment.mpesaCode.trim() : "",
       },
       dateSold: new Date(),
     });
@@ -154,13 +257,12 @@ export const checkoutSale = async (req, res, next) => {
       }
     );
 
-    // ✅ Respond once — sale is guaranteed defined
     return res.status(201).json({ success: true, sale });
-
   } catch (err) {
     next(err);
   }
 };
+
 // ✅ Update this if you want totals by period (changed from totalPrice -> total)
 export const totalSales = async (req, res, next) => {
   if (!req.user.isAdmin) {
