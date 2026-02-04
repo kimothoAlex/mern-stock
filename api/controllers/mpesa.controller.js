@@ -11,10 +11,9 @@ function escapeCsv(v) {
 export const openSession = async (req, res) => {
   try {
     const cashierId = req.user.id;
-    const { shopId, openingCashInHand, openingFloat, notes } = req.body;
+    const {  openingCashInHand, openingFloat, notes } = req.body;
 
     const session = await MpesaSession.create({
-      shopId,
       cashierId,
       openingCashInHand: Number(openingCashInHand),
       openingFloat: Number(openingFloat),
@@ -31,23 +30,21 @@ export const openSession = async (req, res) => {
 
 export const getCurrentSession = async (req, res) => {
   const cashierId = req.user.id;
-  const { shopId } = req.query;
-  const session = await MpesaSession.findOne({ shopId, cashierId, status: "OPEN" }).sort({ openedAt: -1 });
+  const session = await MpesaSession.findOne({  cashierId, status: "OPEN" }).sort({ openedAt: -1 });
   res.json(session);
 };
 
 export const createTxn = async (req, res) => {
   try {
     const performedBy = req.user.id;
-    const { shopId, type, amount, mpesaCode, phone, note } = req.body;
+    const {type, amount, mpesaCode, phone, note } = req.body;
 
-    const session = await MpesaSession.findOne({ shopId, cashierId: performedBy, status: "OPEN" });
+    const session = await MpesaSession.findOne({  cashierId: performedBy, status: "OPEN" });
     if (!session) return res.status(400).json({ message: "No open M-Pesa session. Open a session first." });
 
     const { cashDelta, floatDelta } = computeDeltas({ type, amount });
 
     const txn = await MpesaTxn.create({
-      shopId,
       sessionId: session._id,
       type,
       amount: Number(amount),
@@ -67,9 +64,9 @@ export const createTxn = async (req, res) => {
 };
 
 export const listTxns = async (req, res) => {
-  const { shopId, from, to, type, q, page = 1, limit = 25 } = req.query;
+  const { from, to, type, q, page = 1, limit = 25 } = req.query;
 
-  const filter = { shopId };
+  const filter = {};
   if (type) filter.type = type;
 
   if (from || to) {
@@ -102,10 +99,10 @@ export const listTxns = async (req, res) => {
 export const reverseTxn = async (req, res) => {
   try {
     const performedBy = req.user.id;
-    const { shopId, note } = req.body;
+    const {note } = req.body;
     const { id } = req.params;
 
-    const original = await MpesaTxn.findOne({ _id: id, shopId });
+    const original = await MpesaTxn.findOne({ _id: id});
     if (!original) return res.status(404).json({ message: "Transaction not found" });
 
     // Ensure you reverse within an open session (recommended)
@@ -113,7 +110,7 @@ export const reverseTxn = async (req, res) => {
     if (!session) return res.status(400).json({ message: "Cannot reverse: session is not OPEN." });
 
     const reversal = await MpesaTxn.create({
-      shopId,
+     
       sessionId: original.sessionId,
       type: "REVERSAL",
       amount: original.amount,
@@ -133,9 +130,9 @@ export const reverseTxn = async (req, res) => {
 };
 
 export const exportTxnsCsv = async (req, res) => {
-  const { shopId, from, to, type, q } = req.query;
+  const { from, to, type, q } = req.query;
 
-  const filter = { shopId };
+  const filter = { };
   if (type) filter.type = type;
 
   if (from || to) {
@@ -250,9 +247,9 @@ export const exportSessionCsv = async (req, res) => {
 export const closeSession = async (req, res) => {
   try {
     const cashierId = req.user.id;
-    const { shopId, closingCashCounted, closingFloatActual, notes } = req.body;
+    const {  closingCashCounted, closingFloatActual, notes } = req.body;
 
-    const session = await MpesaSession.findOne({ shopId, cashierId, status: "OPEN" });
+    const session = await MpesaSession.findOne({ cashierId, status: "OPEN" });
     if (!session) return res.status(400).json({ message: "No OPEN session to close." });
 
     // Sum deltas for this session

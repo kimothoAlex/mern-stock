@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const mpesaSessionSchema = new mongoose.Schema(
   {
-    shopId: { type: mongoose.Schema.Types.ObjectId, ref: "Shop", index: true },
+    // shopId: { type: mongoose.Schema.Types.ObjectId, ref: "Shop", index: true },
     cashierId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     status: { type: String, enum: ["OPEN", "CLOSED"], default: "OPEN", index: true },
 
