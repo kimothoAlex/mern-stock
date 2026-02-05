@@ -305,9 +305,11 @@ const ProductPage = () => {
                       </p>
                     </div>
 
-                    <Link to={`/update-product/${product._id}`}>
-                      <Button color="light">Manage variants</Button>
-                    </Link>
+                      <Link to={`/update-product/${product._id}`}>
+    <Button color="light" className="w-full">
+      {product?.hasVariants ? "Edit Product & Variants" : "Edit Product"}
+    </Button>
+  </Link>
                   </div>
 
                   {variantsLoading ? (
@@ -371,7 +373,7 @@ const ProductPage = () => {
               </Link>
 
               {/* keep your old modal for normal products only */}
-              {!product?.hasVariants && (
+              {/* {!product?.hasVariants && (
                 <Button
                   color="light"
                   onClick={() => setOpenModal(true)}
@@ -380,7 +382,7 @@ const ProductPage = () => {
                 >
                   Quick Sale (This Page)
                 </Button>
-              )}
+              )} */}
 
               <Button
                 color="light"
@@ -389,6 +391,12 @@ const ProductPage = () => {
               >
                 Back to Products
               </Button>
+
+                <Link to={`/update-product/${product._id}`}>
+    <Button color="light" className="w-full">
+      {product?.hasVariants ? "Edit Product & Variants" : "Edit Product"}
+    </Button>
+  </Link>
 
               <p className="text-xs text-gray-500 text-center">
                 {sellEnabled ? "Ready to sell" : "Add stock to enable selling"}
