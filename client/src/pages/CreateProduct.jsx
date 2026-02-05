@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { enqueueSnackbar } from "notistack";
 import { Alert, Button, FileInput, Label, Select, TextInput, Textarea } from "flowbite-react";
 import { getDownloadURL, getStorage, ref, uploadBytesResumable } from "firebase/storage";
@@ -45,15 +45,24 @@ const DEFAULT_CATEGORIES = [
 
 const UNITS = ["pcs", "kg", "g", "ltr", "ml", "box", "pack"];
 
-// Helpers: convert entered qty to base unit qty (ml/g)
-// ltr -> ml, kg -> g
-const toBaseQty = (qty, unit) => {
+// Convert qty in input unit -> qty in base unit (ml or g)
+const toBaseQty = (qty, unit, baseUnit) => {
   const q = Number(qty || 0);
   if (!Number.isFinite(q) || q < 0) return 0;
 
-  if (unit === "ltr") return Math.round(q * 1000); // -> ml
-  if (unit === "kg") return Math.round(q * 1000);  // -> g
-  return Math.round(q); // already ml or g (or others, but we mainly use ml/g here)
+  if (baseUnit === "ml") {
+    if (unit === "ltr") return Math.round(q * 1000);
+    if (unit === "ml") return Math.round(q);
+    return 0;
+  }
+
+  if (baseUnit === "g") {
+    if (unit === "kg") return Math.round(q * 1000);
+    if (unit === "g") return Math.round(q);
+    return 0;
+  }
+
+  return 0;
 };
 
 const CreateProduct = () => {
@@ -63,17 +72,22 @@ const CreateProduct = () => {
   const [publishError, setPublishError] = useState(null);
   const [useCustomCategory, setUseCustomCategory] = useState(false);
 
-  // ✅ New: toggle for shared stock + variants
+  // ✅ Toggle variant mode
   const [hasVariants, setHasVariants] = useState(false);
 
-  // ✅ New: base stock inputs
-  const [baseUnit, setBaseUnit] = useState("ml"); // base units should be ml or g
-  const [baseStockInputUnit, setBaseStockInputUnit] = useState("ltr"); // for user convenience
+  // ✅ base stock inputs (for variants)
+  const [baseUnit, setBaseUnit] = useState("ml"); // ml | g
+  const [baseStockInputUnit, setBaseStockInputUnit] = useState("ltr"); // ltr/ml or kg/g
   const [baseStockInputQty, setBaseStockInputQty] = useState("");
 
-  // ✅ New: variants list
+  // ✅ allowed sell units depend on baseUnit
+  const variantSellUnits = useMemo(() => {
+    return baseUnit === "ml" ? ["ltr", "ml"] : ["kg", "g"];
+  }, [baseUnit]);
+
+  // ✅ variants list
   const [variants, setVariants] = useState([
-    { name: "", barcode: "", price: "", sellUnit: "ltr", sizeInput: "" }, // sizeInput is in sellUnit, we convert to base on submit
+    { name: "", barcode: "", price: "", sellUnit: "ltr", sizeInput: "" },
   ]);
 
   const [formData, setFormData] = useState({
@@ -92,7 +106,23 @@ const CreateProduct = () => {
 
   const navigate = useNavigate();
 
-  const variantSellUnits = useMemo(() => ["ltr", "ml", "kg", "g", "pcs", "pack", "box"], []);
+  // ✅ Keep units consistent when baseUnit changes
+  useEffect(() => {
+    // base stock input unit
+    if (baseUnit === "ml" && !["ltr", "ml"].includes(baseStockInputUnit)) setBaseStockInputUnit("ltr");
+    if (baseUnit === "g" && !["kg", "g"].includes(baseStockInputUnit)) setBaseStockInputUnit("kg");
+
+    // fix variant rows sellUnit
+    setVariants((prev) =>
+      prev.map((v) => {
+        const allowed = baseUnit === "ml" ? ["ltr", "ml"] : ["kg", "g"];
+        return allowed.includes(v.sellUnit)
+          ? v
+          : { ...v, sellUnit: allowed[0], sizeInput: "" };
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseUnit]);
 
   const handleUpdloadImage = async () => {
     try {
@@ -101,6 +131,7 @@ const CreateProduct = () => {
         return;
       }
       setImageUploadError(null);
+
       const storage = getStorage(app);
       const fileName = new Date().getTime() + "-" + file.name;
       const storageRef = ref(storage, fileName);
@@ -132,7 +163,11 @@ const CreateProduct = () => {
   };
 
   const addVariantRow = () => {
-    setVariants((prev) => [...prev, { name: "", barcode: "", price: "", sellUnit: "ltr", sizeInput: "" }]);
+    const defaultSellUnit = baseUnit === "ml" ? "ltr" : "kg";
+    setVariants((prev) => [
+      ...prev,
+      { name: "", barcode: "", price: "", sellUnit: defaultSellUnit, sizeInput: "" },
+    ]);
   };
 
   const removeVariantRow = (idx) => {
@@ -147,51 +182,59 @@ const CreateProduct = () => {
     if (!formData.name.trim()) return "Product name is required";
     if (!formData.category.trim()) return "Category is required";
 
-    // base stock
     if (!["ml", "g"].includes(baseUnit)) return "Base unit must be ml or g";
     if (baseStockInputQty === "" || Number(baseStockInputQty) < 0) return "Valid base stock quantity is required";
 
-    const stockBaseQty = toBaseQty(baseStockInputQty, baseStockInputUnit);
+    const stockBaseQty = toBaseQty(baseStockInputQty, baseStockInputUnit, baseUnit);
     if (!Number.isFinite(stockBaseQty) || stockBaseQty < 0) return "Base stock is invalid";
 
     if (!variants.length) return "Add at least 1 variant";
 
     for (const v of variants) {
-      if (!String(v.name || "").trim()) return "Each variant must have a name";
-      if (v.price === "" || Number(v.price) < 0) return `Valid price required for variant: ${v.name || "(unnamed)"}`;
-      if (v.sizeInput === "" || Number(v.sizeInput) <= 0) return `Valid size required for variant: ${v.name || "(unnamed)"}`;
-      if (!v.sellUnit) return `sellUnit required for variant: ${v.name || "(unnamed)"}`;
+      const vName = String(v.name || "").trim();
+      if (!vName) return "Each variant must have a name";
+      if (v.price === "" || Number(v.price) < 0) return `Valid price required for variant: ${vName}`;
+      if (v.sizeInput === "" || Number(v.sizeInput) <= 0) return `Valid size required for variant: ${vName}`;
+      if (!v.sellUnit) return `sellUnit required for variant: ${vName}`;
+
+      // ensure unit pair matches baseUnit
+      if (baseUnit === "ml" && !["ltr", "ml"].includes(v.sellUnit)) return `Invalid sellUnit for ${vName}`;
+      if (baseUnit === "g" && !["kg", "g"].includes(v.sellUnit)) return `Invalid sellUnit for ${vName}`;
     }
 
-    // prevent duplicates in UI (barcode)
-    const barcodes = variants
-      .map((v) => String(v.barcode || "").trim())
-      .filter(Boolean);
-    const set = new Set(barcodes);
-    if (set.size !== barcodes.length) return "Duplicate variant barcode detected in the form";
+    // prevent duplicate barcodes in form
+    const barcodes = variants.map((v) => String(v.barcode || "").trim()).filter(Boolean);
+    if (new Set(barcodes).size !== barcodes.length) return "Duplicate variant barcode detected in the form";
 
     return null;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      setPublishError(null);
+    setPublishError(null);
 
+    try {
+      // ===== NORMAL PRODUCT =====
       if (!hasVariants) {
-        // ===== NORMAL PRODUCT =====
         if (!formData.name.trim()) return setPublishError("Product name is required");
         if (!formData.category.trim()) return setPublishError("Category is required");
         if (formData.price === "" || Number(formData.price) < 0) return setPublishError("Valid price is required");
         if (formData.quantity === "" || Number(formData.quantity) < 0) return setPublishError("Valid quantity is required");
 
         const payload = {
-          ...formData,
+          name: formData.name.trim(),
+          category: formData.category.trim(),
+          type: formData.type || "general",
+          description: String(formData.description || "").trim(),
+          imageUrl: formData.imageUrl || undefined,
+
+          hasVariants: false, // ✅ consistent
           price: Number(formData.price),
           quantity: Number(formData.quantity),
+          unit: formData.unit || "pcs",
+          barcode: String(formData.barcode || "").trim() || undefined,
           costPrice: formData.costPrice === "" ? undefined : Number(formData.costPrice),
           reorderLevel: formData.reorderLevel === "" ? undefined : Number(formData.reorderLevel),
-          barcode: formData.barcode.trim() || undefined,
         };
 
         const res = await fetch("/api/product/create", {
@@ -201,10 +244,7 @@ const CreateProduct = () => {
         });
 
         const data = await res.json();
-        if (!res.ok) {
-          setPublishError(data.message || "Failed to create product");
-          return;
-        }
+        if (!res.ok) return setPublishError(data.message || "Failed to create product");
 
         enqueueSnackbar("Product Created Successfully", { variant: "success" });
         navigate(`/product/${data.slug}`);
@@ -215,12 +255,10 @@ const CreateProduct = () => {
       const err = validateVariantProduct();
       if (err) return setPublishError(err);
 
-      const stockBaseQty = toBaseQty(baseStockInputQty, baseStockInputUnit);
+      const stockBaseQty = toBaseQty(baseStockInputQty, baseStockInputUnit, baseUnit);
 
-      // convert variants to backend shape:
-      // { name, barcode?, price, sellUnit, unitSizeInBase }
       const mappedVariants = variants.map((v) => {
-        const unitSizeInBase = toBaseQty(v.sizeInput, v.sellUnit); // ltr->ml, kg->g, etc
+        const unitSizeInBase = toBaseQty(v.sizeInput, v.sellUnit, baseUnit);
         return {
           name: String(v.name || "").trim(),
           barcode: String(v.barcode || "").trim() || undefined,
@@ -231,25 +269,25 @@ const CreateProduct = () => {
       });
 
       const payload = {
-        userId: formData.userId, // optional (backend uses req.user.id anyway)
         name: formData.name.trim(),
         category: formData.category.trim(),
         type: formData.type || "general",
         description: String(formData.description || "").trim(),
         imageUrl: formData.imageUrl || undefined,
 
-        // ✅ base stock fields expected by backend
+        // ✅ consistent with updated model + backward-compatible with your controller
+        hasVariants: true,
         isBaseStock: true,
-        baseUnit, // "ml" or "g"
-        stockBaseQty, // number in base unit
 
-        // price/quantity are not used for selling, but backend allows them
+        baseUnit,
+        stockBaseQty,
+
+        // base product not sold directly
         price: 0,
         quantity: 0,
         barcode: undefined,
-
-        // optional extras (keep)
         unit: baseUnit,
+
         costPrice: formData.costPrice === "" ? undefined : Number(formData.costPrice),
         reorderLevel: formData.reorderLevel === "" ? undefined : Number(formData.reorderLevel),
 
@@ -263,19 +301,15 @@ const CreateProduct = () => {
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        setPublishError(data.message || "Failed to create product with variants");
-        return;
-      }
+      if (!res.ok) return setPublishError(data.message || "Failed to create product with variants");
 
       enqueueSnackbar("Variant Product Created Successfully", { variant: "success" });
 
-      // backend returns { success:true, product, variants }
-      const slug = data?.product?.slug;
+      const slug = data?.product?.slug || data?.slug;
       if (slug) navigate(`/product/${slug}`);
       else navigate("/dashboard?tab=products");
     } catch (error) {
-      setPublishError("Something went wrong");
+      setPublishError(error?.message || "Something went wrong");
     }
   };
 
@@ -340,7 +374,7 @@ const CreateProduct = () => {
           </div>
         </div>
 
-        {/* ✅ Toggle Variants */}
+        {/* Toggle Variants */}
         <div className="border rounded-lg p-3 bg-white dark:bg-gray-800">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
@@ -356,13 +390,10 @@ const CreateProduct = () => {
               onClick={() => {
                 setPublishError(null);
                 setHasVariants((v) => !v);
-                // clear normal fields that conflict
                 setFormData((p) => ({
                   ...p,
                   barcode: "",
                   quantity: "",
-                  price: p.price, // keep price for normal; variants use their own prices
-                  unit: p.unit,
                 }));
               }}
             >
@@ -382,9 +413,6 @@ const CreateProduct = () => {
               value={formData.barcode}
               onChange={(e) => setFormData((p) => ({ ...p, barcode: e.target.value }))}
             />
-            <p className="text-xs text-gray-500">
-              If you use a barcode scanner, click here and scan—most scanners type into the field automatically.
-            </p>
           </div>
         )}
 
@@ -452,13 +480,12 @@ const CreateProduct = () => {
                   value={formData.reorderLevel}
                   onChange={(e) => setFormData((p) => ({ ...p, reorderLevel: e.target.value }))}
                 />
-                <p className="text-xs text-gray-500">You can alert when stock goes below this number.</p>
               </div>
             </div>
           </>
         )}
 
-        {/* ✅ Variant product base stock + variants */}
+        {/* Variant product base stock + variants */}
         {hasVariants && (
           <div className="border rounded-lg p-4 space-y-4 bg-white dark:bg-gray-800">
             <div>
@@ -504,7 +531,8 @@ const CreateProduct = () => {
                   onChange={(e) => setBaseStockInputQty(e.target.value)}
                 />
                 <p className="text-xs text-gray-500">
-                  Stored as: <b>{toBaseQty(baseStockInputQty, baseStockInputUnit).toLocaleString()}</b> {baseUnit}
+                  Stored as:{" "}
+                  <b>{toBaseQty(baseStockInputQty, baseStockInputUnit, baseUnit).toLocaleString()}</b> {baseUnit}
                 </p>
               </div>
             </div>
@@ -556,13 +584,11 @@ const CreateProduct = () => {
                     <div>
                       <Label value="Sell Unit" />
                       <Select value={v.sellUnit} onChange={(e) => updateVariant(idx, { sellUnit: e.target.value })}>
-                        {variantSellUnits
-                          .filter((u) => (baseUnit === "ml" ? ["ltr", "ml"].includes(u) : ["kg", "g"].includes(u)))
-                          .map((u) => (
-                            <option key={u} value={u}>
-                              {u}
-                            </option>
-                          ))}
+                        {variantSellUnits.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
                       </Select>
                     </div>
 
@@ -577,7 +603,7 @@ const CreateProduct = () => {
                       />
                       <p className="text-xs text-gray-500">
                         Converts to:{" "}
-                        <b>{toBaseQty(v.sizeInput, v.sellUnit).toLocaleString()}</b> {baseUnit}
+                        <b>{toBaseQty(v.sizeInput, v.sellUnit, baseUnit).toLocaleString()}</b> {baseUnit}
                       </p>
                     </div>
 
@@ -617,9 +643,6 @@ const CreateProduct = () => {
                   value={formData.reorderLevel}
                   onChange={(e) => setFormData((p) => ({ ...p, reorderLevel: e.target.value }))}
                 />
-                <p className="text-xs text-gray-500">
-                  For variants, reorder checks should use base stock (ml/g).
-                </p>
               </div>
             </div>
           </div>
@@ -636,10 +659,17 @@ const CreateProduct = () => {
           />
         </div>
 
-        {/* Image upload (optional) */}
+        {/* Image upload */}
         <div className="flex gap-4 items-center justify-between border-4 border-teal-500 border-dotted p-3">
           <FileInput type="file" accept="image/*" onChange={(e) => setFile(e.target.files[0])} />
-          <Button type="button" gradientDuoTone="purpleToBlue" size="sm" outline onClick={handleUpdloadImage} disabled={imageUploadProgress}>
+          <Button
+            type="button"
+            gradientDuoTone="purpleToBlue"
+            size="sm"
+            outline
+            onClick={handleUpdloadImage}
+            disabled={imageUploadProgress}
+          >
             {imageUploadProgress ? (
               <div className="w-16 h-16">
                 <CircularProgressbar value={imageUploadProgress} text={`${imageUploadProgress}%`} />

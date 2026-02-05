@@ -1,3 +1,4 @@
+// src/pages/POS.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Label, TextInput, Spinner, Table, Modal } from "flowbite-react";
 import { enqueueSnackbar } from "notistack";
@@ -5,7 +6,6 @@ import ThermalReceiptModal from "../components/ThermalReceiptModal.jsx";
 
 export default function POS() {
   const barcodeRef = useRef(null);
-  const receiptRef = useRef(null);
 
   const [barcodeInput, setBarcodeInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -13,7 +13,7 @@ export default function POS() {
 
   // ✅ cart supports both PRODUCT and VARIANT
   // PRODUCT: { kind:"PRODUCT", productId, name, barcode, price, qty }
-  // VARIANT: { kind:"VARIANT", variantId, productId(base), name, barcode, price, qty }
+  // VARIANT: { kind:"VARIANT", variantId, productId(base), name, barcode, price, qty, baseUnit?, unitSizeInBase?, stockBaseQty? }
   const [cart, setCart] = useState([]);
   const [error, setError] = useState("");
 
@@ -188,6 +188,10 @@ export default function POS() {
             name: v.name,
             barcode: v.barcode || "",
             price: Number(v.price || 0),
+            // optional metadata for UI / future improvements:
+            baseUnit: base.baseUnit,
+            unitSizeInBase: v.unitSizeInBase,
+            stockBaseQty: base.stockBaseQty,
           },
           1
         );
@@ -213,6 +217,7 @@ export default function POS() {
           name: p.name,
           barcode: p.barcode || "",
           price: Number(p.price || 0),
+          stockQty: p.quantity,
         },
         1
       );
@@ -352,37 +357,6 @@ export default function POS() {
     }
   };
 
-  const printReceipt = () => {
-    const receiptHtml = receiptRef.current?.innerHTML;
-    if (!receiptHtml) return;
-
-    const w = window.open("", "_blank", "width=380,height=700");
-    if (!w) return;
-
-    w.document.open();
-    w.document.write(`
-      <html>
-      <head>
-        <title>Receipt</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 10px; }
-          .center { text-align:center; }
-          table { width:100%; border-collapse: collapse; }
-          td, th { padding: 6px 0; font-size: 12px; }
-          .line { border-top: 1px dashed #000; margin: 8px 0; }
-          .right { text-align:right; }
-          .bold { font-weight:700; }
-        </style>
-      </head>
-      <body>${receiptHtml}</body>
-      </html>
-    `);
-    w.document.close();
-    w.focus();
-    w.print();
-    w.close();
-  };
-
   if (loadingRegister) {
     return <Alert color="info">Loading POS...</Alert>;
   }
@@ -444,7 +418,7 @@ export default function POS() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && searchByName()}
-                placeholder="e.g. sugar, milk 30l"
+                placeholder="e.g. sugar, milk"
               />
               <Button onClick={searchByName} disabled={searchLoading}>
                 {searchLoading ? <Spinner size="sm" /> : "Search"}
@@ -456,6 +430,8 @@ export default function POS() {
               {(searchResults.variants || []).map((v) => {
                 const base = v.baseProduct;
                 const stock = base?.stockBaseQty ?? base?.quantity ?? 0;
+                const unit = base?.hasVariants ? base?.baseUnit : base?.unit;
+
                 return (
                   <div
                     key={v._id}
@@ -466,7 +442,7 @@ export default function POS() {
                         {v.name} <span className="text-xs text-blue-600">VARIANT</span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        Base: {base?.name || "—"} • Stock: {stock} • KES{" "}
+                        Base: {base?.name || "—"} • Stock: {Number(stock).toLocaleString()} {unit || ""} • KES{" "}
                         {Number(v.price || 0).toLocaleString()}
                       </div>
                     </div>
@@ -481,6 +457,9 @@ export default function POS() {
                             name: v.name,
                             barcode: v.barcode || "",
                             price: Number(v.price || 0),
+                            baseUnit: base?.baseUnit,
+                            unitSizeInBase: v.unitSizeInBase,
+                            stockBaseQty: base?.stockBaseQty,
                           },
                           1
                         )
@@ -493,37 +472,44 @@ export default function POS() {
               })}
 
               {/* PRODUCTS */}
-              {(searchResults.products || []).map((p) => (
-                <div
-                  key={p._id}
-                  className="border rounded p-3 bg-gray-50 dark:bg-gray-900 flex justify-between gap-2"
-                >
-                  <div className="min-w-0">
-                    <div className="font-semibold truncate">{p.name}</div>
-                    <div className="text-xs text-gray-500">
-                      {p.category} • Stock: {(p.stockBaseQty ?? p.quantity ?? 0)} • KES{" "}
-                      {Number(p.price || 0).toLocaleString()}
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() =>
-                      addToCart(
-                        {
-                          kind: "PRODUCT",
-                          productId: p._id,
-                          name: p.name,
-                          barcode: p.barcode || "",
-                          price: Number(p.price || 0),
-                        },
-                        1
-                      )
-                    }
+              {(searchResults.products || []).map((p) => {
+                const stock = p?.hasVariants ? p.stockBaseQty : p.quantity;
+                const unit = p?.hasVariants ? p.baseUnit : p.unit;
+
+                return (
+                  <div
+                    key={p._id}
+                    className="border rounded p-3 bg-gray-50 dark:bg-gray-900 flex justify-between gap-2"
                   >
-                    Add
-                  </Button>
-                </div>
-              ))}
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate">{p.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {p.category} • Stock: {Number(stock ?? 0).toLocaleString()} {unit || ""} • KES{" "}
+                        {Number(p.price || 0).toLocaleString()}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        addToCart(
+                          {
+                            kind: "PRODUCT",
+                            productId: p._id,
+                            name: p.name,
+                            barcode: p.barcode || "",
+                            price: Number(p.price || 0),
+                            stockQty: p.quantity,
+                          },
+                          1
+                        )
+                      }
+                      disabled={p.hasVariants} // optional: prevent selling base product if it uses variants
+                    >
+                      Add
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -546,13 +532,11 @@ export default function POS() {
 
               <Table.Body className="divide-y">
                 {cart.map((i) => (
-                  <Table.Row key={i.kind === "VARIANT" ? i.variantId : i.productId}>
+                  <Table.Row key={i.kind === "VARIANT" ? `v:${i.variantId}` : `p:${i.productId}`}>
                     <Table.Cell>
                       <div className="font-semibold">
                         {i.name}{" "}
-                        {i.kind === "VARIANT" ? (
-                          <span className="text-xs text-blue-600">VARIANT</span>
-                        ) : null}
+                        {i.kind === "VARIANT" ? <span className="text-xs text-blue-600">VARIANT</span> : null}
                       </div>
                       <div className="text-xs text-gray-500">Barcode: {i.barcode || "—"}</div>
                     </Table.Cell>
@@ -597,12 +581,7 @@ export default function POS() {
             <div className="flex items-end gap-3">
               <div>
                 <Label value="Discount (KES)" />
-                <TextInput
-                  type="number"
-                  min={0}
-                  value={discount}
-                  onChange={(e) => setDiscount(e.target.value)}
-                />
+                <TextInput type="number" min={0} value={discount} onChange={(e) => setDiscount(e.target.value)} />
               </div>
             </div>
 
