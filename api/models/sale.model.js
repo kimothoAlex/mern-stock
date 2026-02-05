@@ -26,7 +26,8 @@ const saleSchema = new mongoose.Schema(
     registerId: { type: mongoose.Schema.Types.ObjectId, ref: "Register", required: true },
 
     // ✅ choose ONE:
-    cashierId: { type: String, required: true }, // easiest with req.user.id
+    cashierId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+ // easiest with req.user.id
     // cashierId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 
     receiptNo: { type: String, unique: true, required: true },
