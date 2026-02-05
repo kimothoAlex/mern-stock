@@ -8,6 +8,7 @@ import registerRoutes from "./routes/register.route.js";;
 import salesRoutes from "./routes/sales.route.js"
 import mpesaRoutes from "./routes/mpesa.route.js"
 import cookieParser from "cookie-parser";
+import variantRoutes from "./routes/productVariant.route.js";
 // import sseServer from "./controllers/sseServer.js"
 import cors from "cors"
 import path from "path"
@@ -40,6 +41,8 @@ app.use("/api/product",productRoutes);
 app.use("/api/sale",salesRoutes);
 app.use("/api/register", registerRoutes);
 app.use("/api/mpesa", mpesaRoutes)
+
+app.use("/api/variant", variantRoutes);
 // sseServer(app);
 
 app.use(express.static(path.join(_dirname, "/client/dist")));

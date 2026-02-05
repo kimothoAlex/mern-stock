@@ -1,210 +1,217 @@
+// controllers/product.controller.js
 import Product from "../models/product.model.js";
 import ProductVariant from "../models/productVariant.model.js";
-
 import { errorHandler } from "../utils/error.js";
 
-// controllers/product.controller.js
+/**
+ * Helpers
+ */
+const slugify = (name) =>
+  String(name || "")
+    .trim()
+    .toLowerCase()
+    .split(" ")
+    .join("-")
+    .replace(/[^a-zA-Z0-9-]/g, "");
 
+const toNum = (v, fallback = undefined) => {
+  if (v === undefined || v === null || v === "") return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const cleanStr = (v) => String(v || "").trim();
+
+const isDupKeyErr = (err) => err?.code === 11000;
+
+/**
+ * CREATE PRODUCT (supports variants)
+ * - Normal product: { name, category, price, quantity, barcode?, unit? }
+ * - Variant/base-stock product:
+ *   {
+ *     name, category,
+ *     baseUnit: "ml"|"g"|"pcs",
+ *     stockBaseQty: number,
+ *     variants: [{ name, price, unitSizeInBase, sellUnit?, barcode? }]
+ *   }
+ */
 export const create = async (req, res, next) => {
   try {
-    const name = String(req.body.name || "").trim();
-    const category = String(req.body.category || "").trim();
-    const type = req.body.type ? String(req.body.type).trim() : "general";
+    const name = cleanStr(req.body.name);
+    const category = cleanStr(req.body.category);
+    const type = cleanStr(req.body.type) || "general";
 
     if (!name || !category) {
       return next(errorHandler(400, "Please provide product name and category"));
     }
 
-    // ✅ New: optional variants array
-    // variants: [{ name, barcode?, price, sellUnit, unitSizeInBase }]
     const variants = Array.isArray(req.body.variants) ? req.body.variants : [];
+    const hasVariants = variants.length > 0;
 
-    // ✅ Decide: base-stock product if variants provided OR explicit isBaseStock flag
-    const isBaseStock = Boolean(req.body.isBaseStock) || variants.length > 0;
+    const slug = slugify(name);
 
-    // Base unit & base stock only required for base-stock products
-    const baseUnit = isBaseStock ? String(req.body.baseUnit || req.body.unit || "").trim() : "";
-    const stockBaseQty = isBaseStock ? Number(req.body.stockBaseQty ?? NaN) : null;
+    // Duplicate name/slug check
+    const existingName = await Product.findOne({ name });
+    if (existingName) return next(errorHandler(400, "Product name already exists"));
 
-    if (isBaseStock) {
-      if (!baseUnit) return next(errorHandler(400, "baseUnit is required (e.g. ml, g) for variant products"));
+    // ✅ If variants exist, enforce base stock fields
+    let baseUnit;
+    let stockBaseQty;
 
+    if (hasVariants) {
+      baseUnit = cleanStr(req.body.baseUnit || req.body.unit);
+      stockBaseQty = toNum(req.body.stockBaseQty, NaN);
+
+      if (!baseUnit) return next(errorHandler(400, "baseUnit is required (ml/g/pcs) for variant products"));
       if (!Number.isFinite(stockBaseQty) || stockBaseQty < 0) {
         return next(errorHandler(400, "stockBaseQty must be a valid number (>= 0)"));
       }
 
-      if (!variants.length) {
-        return next(errorHandler(400, "Provide at least 1 variant for a base-stock product"));
-      }
-
-      // validate variants
+      // Validate variants & barcode uniqueness
       for (const v of variants) {
-        const vName = String(v?.name || "").trim();
+        const vName = cleanStr(v?.name);
+        const vPrice = toNum(v?.price, NaN);
+        const unitSizeInBase = toNum(v?.unitSizeInBase, NaN);
+        const sellUnit = cleanStr(v?.sellUnit);
+
         if (!vName) return next(errorHandler(400, "Each variant must have a name"));
-
-        const vPrice = Number(v?.price);
-        if (!Number.isFinite(vPrice) || vPrice < 0) return next(errorHandler(400, `Valid price required for variant: ${vName}`));
-
-        const sellUnit = String(v?.sellUnit || "").trim();
-        if (!sellUnit) return next(errorHandler(400, `sellUnit required for variant: ${vName}`));
-
-        const unitSizeInBase = Number(v?.unitSizeInBase);
+        if (!Number.isFinite(vPrice) || vPrice < 0) {
+          return next(errorHandler(400, `Valid price required for variant: ${vName}`));
+        }
         if (!Number.isFinite(unitSizeInBase) || unitSizeInBase <= 0) {
           return next(errorHandler(400, `unitSizeInBase must be > 0 for variant: ${vName}`));
         }
+        // sellUnit is optional in DB, but if you want it required in UI, keep this check:
+        if (!sellUnit) return next(errorHandler(400, `sellUnit required for variant: ${vName}`));
 
-        const vBarcode = v?.barcode ? String(v.barcode).trim() : "";
+        const vBarcode = cleanStr(v?.barcode);
         if (vBarcode) {
-          const existingVarBarcode = await ProductVariant.findOne({ barcode: vBarcode });
-          if (existingVarBarcode) return next(errorHandler(400, `Variant barcode already exists: ${vBarcode}`));
+          const exists = await ProductVariant.findOne({ barcode: vBarcode });
+          if (exists) return next(errorHandler(400, `Variant barcode already exists: ${vBarcode}`));
         }
       }
     }
 
-    // slug
-    const slug = name
-      .split(" ")
-      .join("-")
-      .toLowerCase()
-      .replace(/[^a-zA-Z0-9-]/g, "");
-
-    // Friendly duplicate product-name check
-    const existingName = await Product.findOne({ name });
-    if (existingName) return next(errorHandler(400, "Product name already exists"));
-
-    // ✅ barcode ONLY for normal products (variants handle their own barcodes)
-    const barcode =
-      !isBaseStock && req.body.barcode && String(req.body.barcode).trim() !== ""
-        ? String(req.body.barcode).trim()
-        : undefined;
-
+    // ✅ Normal product barcode only (variants use their own)
+    const barcode = !hasVariants && cleanStr(req.body.barcode) ? cleanStr(req.body.barcode) : undefined;
     if (barcode) {
       const existingBarcode = await Product.findOne({ barcode });
       if (existingBarcode) return next(errorHandler(400, "Barcode already exists"));
     }
 
-    // Numeric fields
-    // For base-stock products:
-    // - price is optional (usually 0 because you sell variants)
-    // - quantity is optional (we use stockBaseQty)
-    const price = isBaseStock ? Number(req.body.price ?? 0) : Number(req.body.price);
-    const quantity = isBaseStock ? Number(req.body.quantity ?? 0) : Number(req.body.quantity);
+    // Normal product numeric requirements
+    const price = toNum(req.body.price, NaN);
+    const quantity = toNum(req.body.quantity, NaN);
 
-    if (!isBaseStock) {
+    if (!hasVariants) {
       if (req.body.price === undefined || req.body.quantity === undefined) {
         return next(errorHandler(400, "Please provide all required fields"));
       }
-      if (Number.isNaN(price) || price < 0) return next(errorHandler(400, "Valid price is required"));
-      if (Number.isNaN(quantity) || quantity < 0) return next(errorHandler(400, "Valid quantity is required"));
-    } else {
       if (!Number.isFinite(price) || price < 0) return next(errorHandler(400, "Valid price is required"));
       if (!Number.isFinite(quantity) || quantity < 0) return next(errorHandler(400, "Valid quantity is required"));
     }
 
-    const costPrice =
-      req.body.costPrice === undefined || req.body.costPrice === null || req.body.costPrice === ""
-        ? undefined
-        : Number(req.body.costPrice);
+    const costPrice = toNum(req.body.costPrice, undefined);
+    const reorderLevel = toNum(req.body.reorderLevel, undefined);
+    if (costPrice !== undefined && costPrice < 0) return next(errorHandler(400, "Valid cost price is required"));
+    if (reorderLevel !== undefined && reorderLevel < 0) return next(errorHandler(400, "Valid reorder level is required"));
 
-    const reorderLevel =
-      req.body.reorderLevel === undefined || req.body.reorderLevel === null || req.body.reorderLevel === ""
-        ? undefined
-        : Number(req.body.reorderLevel);
-
-    if (costPrice !== undefined && (Number.isNaN(costPrice) || costPrice < 0))
-      return next(errorHandler(400, "Valid cost price is required"));
-
-    if (reorderLevel !== undefined && (Number.isNaN(reorderLevel) || reorderLevel < 0))
-      return next(errorHandler(400, "Valid reorder level is required"));
-
-    // ✅ Create base product
-    const newProduct = new Product({
+    // ✅ Create product
+    const product = await Product.create({
       userId: req.user.id,
       slug,
       name,
       category,
       type,
 
-      // normal product barcode
+      // selling defaults (normal products)
+      price: hasVariants ? 0 : price,
+      quantity: hasVariants ? 0 : quantity,
       barcode,
 
-      // normal stock
-      price,
-      quantity,
+      // base-stock fields for variants
+      hasVariants,
+      baseUnit: hasVariants ? baseUnit : undefined,
+      stockBaseQty: hasVariants ? stockBaseQty : undefined,
 
-      // base-stock fields
-      isBaseStock,
-      baseUnit: isBaseStock ? baseUnit : undefined,
-      stockBaseQty: isBaseStock ? stockBaseQty : undefined,
-
-      unit: req.body.unit ? String(req.body.unit).trim() : "pcs",
+      unit: cleanStr(req.body.unit) || "pcs",
       costPrice,
       reorderLevel,
-
-      description: req.body.description ? String(req.body.description).trim() : "",
-      imageUrl: req.body.imageUrl ? String(req.body.imageUrl).trim() : undefined,
+      description: cleanStr(req.body.description),
+      imageUrl: cleanStr(req.body.imageUrl) || "",
     });
 
-    const savedProduct = await newProduct.save();
-
-    // ✅ Create variants if provided
-    if (isBaseStock && variants.length) {
-      const createdVariants = await ProductVariant.insertMany(
+    // ✅ Create variants as separate documents
+    let createdVariants = [];
+    if (hasVariants) {
+      createdVariants = await ProductVariant.insertMany(
         variants.map((v) => ({
-          productId: savedProduct._id,
-          name: String(v.name).trim(),
-          barcode: v.barcode ? String(v.barcode).trim() : undefined,
-          price: Number(v.price),
-          sellUnit: String(v.sellUnit).trim(),
-          unitSizeInBase: Number(v.unitSizeInBase),
+          productId: product._id,
+          name: cleanStr(v.name),
+          barcode: cleanStr(v.barcode) || undefined,
+          price: toNum(v.price, 0),
+          sellUnit: cleanStr(v.sellUnit),
+          unitSizeInBase: toNum(v.unitSizeInBase, 1),
           isActive: v.isActive === undefined ? true : Boolean(v.isActive),
         }))
       );
-
-      return res.status(201).json({
-        success: true,
-        product: savedProduct,
-        variants: createdVariants,
-      });
     }
 
-    // normal product response
-    return res.status(201).json(savedProduct);
-  } catch (error) {
-    // handle duplicate key errors nicely
-    if (error?.code === 11000) {
+    return res.status(201).json({
+      success: true,
+      product,
+      variants: createdVariants,
+    });
+  } catch (err) {
+    if (isDupKeyErr(err)) {
       return next(errorHandler(400, "Duplicate value detected (name/slug/barcode)."));
     }
-    next(error);
+    next(err);
   }
 };
 
-
+/**
+ * GET PRODUCTS
+ * Supports:
+ * - barcode: tries variant barcode first, then product barcode
+ * - searchTerm: returns matching products + matching variants (with baseProduct attached)
+ */
 export const getproducts = async (req, res, next) => {
   try {
-    const startIndex = parseInt(req.query.startIndex) || 0;
-    const limit = parseInt(req.query.limit) || 9;
+    const startIndex = parseInt(req.query.startIndex, 10) || 0;
+    const limit = parseInt(req.query.limit, 10) || 9;
     const sortDirection = req.query.order === "asc" ? 1 : -1;
 
-    const barcode = req.query.barcode ? String(req.query.barcode).trim() : "";
-    const searchTerm = req.query.searchTerm ? String(req.query.searchTerm).trim() : "";
+    const barcode = req.query.barcode ? cleanStr(req.query.barcode) : "";
+    const searchTerm = req.query.searchTerm ? cleanStr(req.query.searchTerm) : "";
 
-    // ✅ BARCODE PATH (variant first, then product)
+    // ✅ BARCODE: variant first
     if (barcode) {
       const variant = await ProductVariant.findOne({ barcode, isActive: true }).lean();
+
       if (variant) {
         const baseProduct = await Product.findById(variant.productId).lean();
+
+        // If base product missing or not in variants mode, treat as not found
+        if (!baseProduct || !baseProduct.hasVariants) {
+          return res.status(200).json({
+            products: [],
+            variants: [],
+            totalProducts: 0,
+            matched: null,
+          });
+        }
+
         return res.status(200).json({
-          products: baseProduct ? [baseProduct] : [],
-          variants: baseProduct ? [{ ...variant, baseProduct }] : [],
-          totalProducts: baseProduct ? 1 : 0,
-          matched: baseProduct
-            ? { kind: "VARIANT", variantId: String(variant._id), productId: String(baseProduct._id) }
-            : null,
+          products: [baseProduct],
+          variants: [{ ...variant, baseProduct }],
+          totalProducts: 1,
+          matched: { kind: "VARIANT", variantId: String(variant._id), productId: String(baseProduct._id) },
         });
       }
 
       const product = await Product.findOne({ barcode }).lean();
+
       return res.status(200).json({
         products: product ? [product] : [],
         variants: [],
@@ -213,7 +220,7 @@ export const getproducts = async (req, res, next) => {
       });
     }
 
-    // ✅ Normal product filters (same as your current)
+    // ✅ Product filter
     const productFilter = {
       ...(req.query.userId && { userId: req.query.userId }),
       ...(req.query.category && { category: req.query.category }),
@@ -223,75 +230,97 @@ export const getproducts = async (req, res, next) => {
       ...(searchTerm && { name: { $regex: searchTerm, $options: "i" } }),
     };
 
-    // 1) Products that match
+    // 1) Products that match (base products)
     const products = await Product.find(productFilter)
       .sort({ updatedAt: sortDirection })
       .skip(startIndex)
       .limit(limit)
       .lean();
 
-    // 2) Variants that match (by name)
-    // Optional: also allow filtering variants by category/type by joining to products.
-    // We'll do it properly: find variants, then fetch base products, then apply filters.
-    let variants = [];
+    // Collect base IDs that matched product-name search
+    const matchedProductIds = products.map((p) => String(p._id));
+
+    // 2) Variants matching by variant name (direct hits)
+    let variantHits = [];
     if (searchTerm) {
-      const variantHits = await ProductVariant.find({
+      variantHits = await ProductVariant.find({
         isActive: true,
         name: { $regex: searchTerm, $options: "i" },
       })
         .sort({ updatedAt: sortDirection })
         .limit(limit)
         .lean();
+    }
 
-      // Fetch base products for those variants
-      const baseIds = [...new Set(variantHits.map((v) => String(v.productId)))];
-      const baseProducts = baseIds.length
-        ? await Product.find({
-            _id: { $in: baseIds },
-            ...(req.query.userId && { userId: req.query.userId }),
-            ...(req.query.category && { category: req.query.category }),
-            ...(req.query.type && { type: req.query.type }),
-          }).lean()
-        : [];
+    // 3) ALSO include variants for base-products that matched by name (this is the missing piece)
+    let variantsOfMatchedProducts = [];
+    if (searchTerm && matchedProductIds.length) {
+      variantsOfMatchedProducts = await ProductVariant.find({
+        isActive: true,
+        productId: { $in: matchedProductIds },
+      })
+        .sort({ updatedAt: sortDirection })
+        .lean();
+    }
+
+    // Merge & dedupe variants
+    const mergedVariantMap = new Map();
+    [...variantHits, ...variantsOfMatchedProducts].forEach((v) => {
+      mergedVariantMap.set(String(v._id), v);
+    });
+    const mergedVariants = [...mergedVariantMap.values()];
+
+    // Fetch base products for variants (and apply same category/type/user filters)
+    let variants = [];
+    if (mergedVariants.length) {
+      const baseIds = [...new Set(mergedVariants.map((v) => String(v.productId)))];
+
+      const baseProducts = await Product.find({
+        _id: { $in: baseIds },
+        hasVariants: true, // ✅ only true variant-mode products
+        ...(req.query.userId && { userId: req.query.userId }),
+        ...(req.query.category && { category: req.query.category }),
+        ...(req.query.type && { type: req.query.type }),
+      }).lean();
 
       const baseMap = new Map(baseProducts.map((p) => [String(p._id), p]));
 
-      // keep only variants whose base product passed filters
-      variants = variantHits
+      variants = mergedVariants
         .map((v) => {
           const baseProduct = baseMap.get(String(v.productId));
           if (!baseProduct) return null;
           return { ...v, baseProduct };
         })
-        .filter(Boolean);
+        .filter(Boolean)
+        .slice(0, limit); // keep result size reasonable
     }
 
-    const totalProducts = await Product.countDocuments();
+    // Better: count filtered products (not all products)
+    const totalProducts = await Product.countDocuments(productFilter);
 
     return res.status(200).json({
       products,
-      variants, // ✅ now included for search results
+      variants,
       totalProducts,
       matched: null,
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
 
-
 export const deleteproduct = async (req, res, next) => {
   if (!req.user.isAdmin) {
-    return next(
-      errorHandler(403, "You are not allowed to delete this product")
-    );
+    return next(errorHandler(403, "You are not allowed to delete this product"));
   }
   try {
     await Product.findByIdAndDelete(req.params.productId);
-    res.status(200).json("The product has been deleted");
-  } catch (error) {
-    next(error);
+    // optional: also delete variants
+    await ProductVariant.deleteMany({ productId: req.params.productId });
+    return res.status(200).json("The product has been deleted");
+  } catch (err) {
+    next(err);
   }
 };
 
@@ -306,20 +335,19 @@ export const updateproduct = async (req, res, next) => {
       type: req.body.type,
       category: req.body.category,
       imageUrl: req.body.imageUrl,
-      barcode: req.body.barcode,
 
-      // UI fields
+      // only safe for non-variant products
+      barcode: req.body.barcode,
       unit: req.body.unit,
       description: req.body.description,
 
-      // numeric (cast)
       price: req.body.price,
       quantity: req.body.quantity,
       costPrice: req.body.costPrice,
       reorderLevel: req.body.reorderLevel,
     };
 
-    // Cast numbers safely
+    // cast numbers safely
     ["price", "quantity", "costPrice", "reorderLevel"].forEach((k) => {
       if (update[k] !== undefined && update[k] !== null && update[k] !== "") {
         update[k] = Number(update[k]);
@@ -328,8 +356,18 @@ export const updateproduct = async (req, res, next) => {
       }
     });
 
-    // remove undefined so you don’t overwrite existing values
     Object.keys(update).forEach((k) => update[k] === undefined && delete update[k]);
+
+    // Prevent overwriting barcode/price/quantity for variant products unless you decide to allow it
+    const product = await Product.findById(req.params.productId).lean();
+    if (!product) return next(errorHandler(404, "Product not found"));
+
+    if (product.hasVariants) {
+      delete update.barcode;
+      delete update.price;
+      delete update.quantity;
+      delete update.unit;
+    }
 
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.productId,
@@ -338,108 +376,101 @@ export const updateproduct = async (req, res, next) => {
     );
 
     return res.status(200).json(updatedProduct);
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    if (isDupKeyErr(err)) {
+      return next(errorHandler(400, "Duplicate value detected (name/slug/barcode)."));
+    }
+    next(err);
   }
 };
 
-
-
+/**
+ * Aggregation: product sales ranks (still works for base products)
+ * NOTE: If you want variant-level ranking, tell me and I’ll add it too.
+ */
 export const aggProducts = async (req, res, next) => {
-if (!req.user?.isAdmin) {
-return next(errorHandler(403, "You are not allowed to view the ranks"));
-}
+  if (!req.user?.isAdmin) {
+    return next(errorHandler(403, "You are not allowed to view the ranks"));
+  }
 
+  const limit = parseInt(req.query.limit, 10) || 10;
 
-const limit = parseInt(req.query.limit, 10) || 10;
+  try {
+    const basePipeline = [
+      {
+        $lookup: {
+          from: "sales",
+          let: { pid: "$_id" },
+          pipeline: [
+            { $unwind: "$items" },
+            { $match: { $expr: { $eq: ["$items.productId", "$$pid"] } } },
+            {
+              $group: {
+                _id: null,
+                totalSales: { $sum: "$items.quantity" },
+                amountGenerated: { $sum: "$items.totalPrice" },
+              },
+            },
+          ],
+          as: "salesData",
+        },
+      },
+      { $unwind: { path: "$salesData", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          totalSales: { $ifNull: ["$salesData.totalSales", 0] },
+          amountGenerated: { $ifNull: ["$salesData.amountGenerated", 0] },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          productName: "$name",
+          barcode: 1,
+          category: 1,
+          type: 1,
+          price: 1,
+          totalSales: 1,
+          amountGenerated: 1,
+        },
+      },
+    ];
 
+    const [topSold, leastSold] = await Promise.all([
+      Product.aggregate([...basePipeline, { $sort: { totalSales: -1 } }, { $limit: limit }]),
+      Product.aggregate([...basePipeline, { $sort: { totalSales: 1 } }, { $limit: limit }]),
+    ]);
 
-try {
-const basePipeline = [
-{
-$lookup: {
-from: "sales",
-let: { pid: "$_id" },
-pipeline: [
-{ $unwind: "$items" },
-{ $match: { $expr: { $eq: ["$items.productId", "$$pid"] } } },
-{
-$group: {
-_id: null,
-totalSales: { $sum: "$items.quantity" },
-amountGenerated: { $sum: "$items.totalPrice" },
-},
-},
-],
-as: "salesData",
-},
-},
-{ $unwind: { path: "$salesData", preserveNullAndEmptyArrays: true } },
-{
-$addFields: {
-totalSales: { $ifNull: ["$salesData.totalSales", 0] },
-amountGenerated: { $ifNull: ["$salesData.amountGenerated", 0] },
-},
-},
-{
-$project: {
-_id: 1,
-productName: "$name", // <-- Product schema field
-barcode: 1,
-category: 1,
-type: 1,
-price: 1,
-totalSales: 1,
-amountGenerated: 1,
-},
-},
-];
-
-
-const [topSold, leastSold] = await Promise.all([
-Product.aggregate([
-...basePipeline,
-{ $sort: { totalSales: -1 } },
-{ $limit: limit },
-]),
-Product.aggregate([
-...basePipeline,
-{ $sort: { totalSales: 1 } },
-{ $limit: limit },
-]),
-]);
-
-
-res.status(200).json({ topSold, leastSold });
-} catch (err) {
-next(errorHandler(500, "Error retrieving sales ranks"));
-}
+    return res.status(200).json({ topSold, leastSold });
+  } catch (err) {
+    next(errorHandler(500, "Error retrieving sales ranks"));
+  }
 };
 
 export const lowStockProducts = async (req, res, next) => {
   try {
     const DEFAULT_REORDER_LEVEL = 9;
 
+    // ✅ if product.hasVariants => compare stockBaseQty vs reorderLevel
+    // ✅ else compare quantity vs reorderLevel
     const products = await Product.find({
-      // Only include products where quantity < (reorderLevel or default)
       $expr: {
         $lt: [
-          "$quantity",
+          { $cond: [{ $eq: ["$hasVariants", true] }, "$stockBaseQty", "$quantity"] },
           { $ifNull: ["$reorderLevel", DEFAULT_REORDER_LEVEL] },
         ],
       },
-    }).select("name quantity reorderLevel");
+    }).select("name quantity stockBaseQty baseUnit reorderLevel hasVariants");
 
-    const reducedProducts = products.reduce((acc, product) => {
-      acc[product.name] = product.quantity;
+    const reducedProducts = products.reduce((acc, p) => {
+      acc[p.name] = p.hasVariants ? `${p.stockBaseQty} ${p.baseUnit}` : p.quantity;
       return acc;
     }, {});
 
     const lowStockProducts = Object.keys(reducedProducts);
 
-    // Always respond (even if empty) so frontend doesn't hang
-    return res.status(200).json({ lowStockProducts });
-  } catch (error) {
+    return res.status(200).json({ lowStockProducts, details: reducedProducts });
+  } catch (err) {
     return next(errorHandler(500, "Error retrieving products"));
   }
 };
